@@ -4,7 +4,7 @@ Bot: Sηαdοωβοτ
 */
 
 const yts = require('yt-search');
-const ytdl = require('@distube/ytdl-core'); // <--- Nueva librería estable
+const ytdl = require('ytdl-core');
 const fs = require('fs');
 const path = require('path');
 
@@ -16,6 +16,7 @@ module.exports = {
 
     try {
       await sock.sendMessage(from, { react: { text: '🔍', key: m.key } });
+      
       const search = await yts(text);
       const video = search.videos[0];
 
@@ -30,11 +31,14 @@ module.exports = {
 
       const audioPath = path.join(__dirname, `temp_${Date.now()}.mp3`);
       
-      // Descarga usando la nueva librería
       const stream = ytdl(video.url, { 
           filter: 'audioonly', 
           quality: 'highestaudio',
-          lang: 'es'
+          requestOptions: {
+              headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+              }
+          }
       });
       
       const file = fs.createWriteStream(audioPath);
@@ -47,8 +51,13 @@ module.exports = {
           ptt: false 
         }, { quoted: m });
 
-        fs.unlinkSync(audioPath);
+        if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
         await sock.sendMessage(from, { react: { text: '✅', key: m.key } });
+      });
+
+      stream.on('error', (err) => {
+          console.error('Error en stream:', err);
+          if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
       });
 
     } catch (error) {
