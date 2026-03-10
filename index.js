@@ -1,5 +1,6 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const chalk = require('chalk');
+const gradient = require('gradient-string');
 const readline = require('readline');
 const config = require('../config/config');
 const logger = require('./utils/logger');
@@ -7,18 +8,84 @@ const { loadCommands } = require('./handlers/commandHandler');
 const { handleMessage } = require('./handlers/messageHandler');
 const { handleGroupUpdate } = require('./handlers/groupHandler');
 
-// ─── Banner ────────────────────────────────────────────────────────────────────
-console.log(
-  chalk.bold.black.bgWhite(
-    `\n  🌑  ${config.bot.name.toUpperCase()}  |  WhatsApp Bot  \n`
-  )
-);
-console.log(chalk.gray('  Iniciando...\n'));
+// ─── Degradados ────────────────────────────────────────────────────────────────
+const fuego = gradient(['#ff0000', '#ff4500', '#ff8c00', '#ffd700']);
+const oceano = gradient(['#00bfff', '#0080ff', '#0000cd', '#00ced1']);
+const fuegoOceano = gradient([
+  '#ff4500', '#ff8c00', '#ffd700',
+  '#00ced1', '#0080ff', '#0000cd',
+]);
 
-// ─── Cargar Comandos ───────────────────────────────────────────────────────────
-loadCommands();
+// ─── Animación del banner ──────────────────────────────────────────────────────
+async function mostrarBanner() {
+  const nombre = 'S\u03b7\u03b1d\u03bf\u03c9\u03b2\u03bf\u03c4';  // Sηαdοωβοτ
+  const frames = [
+    gradient(['#ff4500', '#ff8c00', '#ffd700', '#00ced1', '#0080ff', '#0000cd']),
+    gradient(['#ff8c00', '#ffd700', '#00ced1', '#0080ff', '#0000cd', '#ff4500']),
+    gradient(['#ffd700', '#00ced1', '#0080ff', '#0000cd', '#ff4500', '#ff8c00']),
+    gradient(['#00ced1', '#0080ff', '#0000cd', '#ff4500', '#ff8c00', '#ffd700']),
+    gradient(['#0080ff', '#0000cd', '#ff4500', '#ff8c00', '#ffd700', '#00ced1']),
+    gradient(['#0000cd', '#ff4500', '#ff8c00', '#ffd700', '#00ced1', '#0080ff']),
+  ];
 
-// ─── Detectar ruta de Chromium en Termux ──────────────────────────────────────
+  const lineas = [
+    '                                          ',
+    '  ░██████╗██╗  ██╗ █████╗ ██████╗  ██████╗ ██╗    ██╗██████╗  ██████╗ ████████╗  ',
+    '  ██╔════╝██║  ██║██╔══██╗██╔══██╗██╔═══██╗██║    ██║██╔══██╗██╔═══██╗╚══██╔══╝  ',
+    '  ╚█████╗ ███████║███████║██║  ██║██║   ██║██║ █╗ ██║██████╔╝██║   ██║   ██║     ',
+    '   ╚═══██╗██╔══██║██╔══██║██║  ██║██║   ██║██║███╗██║██╔══██╗██║   ██║   ██║     ',
+    '  ██████╔╝██║  ██║██║  ██║██████╔╝╚██████╔╝╚███╔███╔╝██████╔╝╚██████╔╝   ██║     ',
+    '  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝  ╚══╝╚══╝ ╚═════╝  ╚═════╝   ╚═╝     ',
+    '                                          ',
+  ];
+
+  process.stdout.write('\x1Bc'); // limpiar terminal
+
+  // Animación: cicla los frames 10 veces
+  for (let i = 0; i < 10; i++) {
+    const g = frames[i % frames.length];
+    process.stdout.write('\x1B[H'); // mover cursor al inicio sin limpiar
+
+    for (const linea of lineas) {
+      console.log(g(linea));
+    }
+
+    // Nombre estilizado debajo del ASCII
+    const nombreGrad = frames[(i + 2) % frames.length];
+    console.log(nombreGrad(`            ✦  ${nombre}  ✦`));
+    console.log('');
+
+    await new Promise((r) => setTimeout(r, 120));
+  }
+
+  // Frame final fijo con degradado fuego→océano
+  process.stdout.write('\x1B[H');
+  for (const linea of lineas) {
+    console.log(fuegoOceano(linea));
+  }
+
+  // Subtítulo
+  console.log(fuegoOceano(`            ✦  ${nombre}  ✦`));
+  console.log('');
+  console.log(
+    chalk.gray('  ┌────────────────────────────────────────────────────────────┐')
+  );
+  console.log(
+    chalk.gray('  │  ') +
+    fuego('🔥 Fuego') +
+    chalk.gray('  &  ') +
+    oceano('🌊 Océano') +
+    chalk.gray('   ·   WhatsApp Bot   ·   ') +
+    chalk.white(`v${require('../package.json').version}`) +
+    chalk.gray('               │')
+  );
+  console.log(
+    chalk.gray('  └────────────────────────────────────────────────────────────┘')
+  );
+  console.log('');
+}
+
+// ─── Detectar Chromium en Termux ──────────────────────────────────────────────
 function detectarChromium() {
   const { execSync } = require('child_process');
   const rutas = [
@@ -29,7 +96,6 @@ function detectarChromium() {
     '/usr/bin/google-chrome',
   ];
 
-  // Intentar encontrarlo con "which"
   try {
     const resultado = execSync('which chromium-browser || which chromium', {
       encoding: 'utf8',
@@ -37,7 +103,6 @@ function detectarChromium() {
     if (resultado) return resultado;
   } catch {}
 
-  // Buscar en rutas conocidas
   const fs = require('fs');
   for (const ruta of rutas) {
     if (fs.existsSync(ruta)) return ruta;
@@ -48,22 +113,14 @@ function detectarChromium() {
 
 const rutaChromium = detectarChromium();
 
-if (rutaChromium) {
-  logger.success(`Chromium encontrado en: ${rutaChromium}`);
-} else {
-  logger.warn('No se encontró Chromium. Instálalo con:');
-  console.log(chalk.yellow('\n  pkg install chromium\n'));
-  process.exit(1);
-}
-
-// ─── Cliente WhatsApp (sin descargar Chromium, usa el del sistema) ─────────────
+// ─── Cliente WhatsApp ──────────────────────────────────────────────────────────
 const client = new Client({
   authStrategy: new LocalAuth({
     dataPath: config.bot.sessionPath,
   }),
   puppeteer: {
     headless: true,
-    executablePath: rutaChromium,   // 👈 usa el Chromium de Termux
+    executablePath: rutaChromium,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -71,7 +128,7 @@ const client = new Client({
       '--disable-accelerated-2d-canvas',
       '--no-first-run',
       '--no-zygote',
-      '--single-process',           // 👈 importante en Termux (sin zygote)
+      '--single-process',
       '--disable-gpu',
       '--disable-extensions',
       '--disable-software-rasterizer',
@@ -87,12 +144,14 @@ function pedirNumero() {
       output: process.stdout,
     });
 
-    console.log(chalk.cyan('\n┌─────────────────────────────────────────┐'));
-    console.log(chalk.cyan('│      🔐  VINCULACIÓN POR CÓDIGO          │'));
-    console.log(chalk.cyan('└─────────────────────────────────────────┘\n'));
+    console.log(chalk.cyan('  ┌─────────────────────────────────────────┐'));
+    console.log(chalk.cyan('  │      🔐  VINCULACIÓN POR CÓDIGO          │'));
+    console.log(chalk.cyan('  └─────────────────────────────────────────┘\n'));
 
     rl.question(
-      chalk.yellow('  📱 Ingresa tu número (con código de país, sin + ni espacios)\n  Ejemplo: 521234567890\n\n  > '),
+      chalk.yellow('  📱 Ingresa tu número (con código de país, sin + ni espacios)\n') +
+      chalk.gray('  Ejemplo: 521234567890\n\n') +
+      chalk.white('  > '),
       (numero) => {
         rl.close();
         const limpio = numero.trim().replace(/[+\-\s]/g, '');
@@ -138,8 +197,19 @@ process.on('uncaughtException', (err) => {
   logger.error(`Excepción no capturada: ${err.message}`);
 });
 
-// ─── Inicializar con Pairing Code ─────────────────────────────────────────────
+// ─── Inicializar ──────────────────────────────────────────────────────────────
 async function iniciar() {
+  // Mostrar banner animado
+  await mostrarBanner();
+
+  // Validar Chromium
+  if (!rutaChromium) {
+    logger.error('No se encontró Chromium. Instálalo con:');
+    console.log(chalk.yellow('\n  pkg install chromium\n'));
+    process.exit(1);
+  }
+  logger.success(`Chromium encontrado en: ${rutaChromium}`);
+
   const fs = require('fs');
   const sessionExiste = fs.existsSync(`${config.bot.sessionPath}/session`);
 
@@ -161,13 +231,20 @@ async function iniciar() {
         const codigoFormateado = codigo.match(/.{1,4}/g).join('-');
 
         console.log('');
-        console.log(chalk.bold.bgGreen.black('  ✅ CÓDIGO DE VINCULACIÓN OBTENIDO  '));
+        console.log(fuegoOceano('  ╔══════════════════════════════════════╗'));
+        console.log(fuegoOceano('  ║   ✅  CÓDIGO DE VINCULACIÓN          ║'));
+        console.log(fuegoOceano('  ╚══════════════════════════════════════╝'));
         console.log('');
-        console.log(chalk.white('  Ve a WhatsApp → Dispositivos vinculados → Vincular con número'));
+        console.log(chalk.gray('  Ve a: WhatsApp → Dispositivos vinculados → Vincular con número'));
         console.log('');
-        console.log(chalk.bold.yellow(`  🔑 Tu código: `) + chalk.bold.bgWhite.black(` ${codigoFormateado} `));
+        console.log(
+          chalk.white('  🔑 Tu código: ') +
+          fuego('██') + ' ' +
+          chalk.bold.bgWhite.black(` ${codigoFormateado} `) +
+          ' ' + oceano('██')
+        );
         console.log('');
-        console.log(chalk.gray('  El código expira en unos minutos. Ingrésalo rápido.\n'));
+        console.log(chalk.gray('  ⏳ El código expira en unos minutos. Ingrésalo rápido.\n'));
       } catch (err) {
         logger.error(`No se pudo obtener el código: ${err.message}`);
         logger.warn('Asegúrate de que el número es correcto y tiene WhatsApp activo.');
