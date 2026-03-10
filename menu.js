@@ -1,7 +1,18 @@
 module.exports = {
     command: ['menu', 'help'],
     run: async (sock, m, from) => {
-        const text = `✨ *Sηαdοωβοτ - MENÚ* ✨\n\n◈ .ping\n◈ .owner\n◈ .menu`;
+        const text = `
+┏━━━━ ✨ *MENÚ* ✨ ━━━━┓
+┃
+┣━━━ 🤖 *BOT INFO*
+┃ ◈ .ping
+┃ ◈ .owner
+┃ ◈ .runtime
+┃
+┣━━━ 🎨 *MULTIPERFIL*
+┃ ◈ .s (Sticker)
+┃
+┗━━━━━━━━━━━━━━━━┛`.trim();
         await sock.sendMessage(from, { text });
     }
 };
