@@ -22,9 +22,9 @@ const checkDependencies = () => {
 }
 checkDependencies()
 
-// IMPORTANTE: Aquí cambiamos disconnectReason por DisconnectReason (con D mayúscula)
+// --- IMPORTACIONES CORREGIDAS PARA NODE V25 ---
 import pkgBaileys from '@whiskeysockets/baileys'
-const { makeWASocket, useMultiFileAuthState, DisconnectReason } = pkgBaileys
+const { makeWASocket, useMultiFileAuthState, DisconnectReason } = pkgBaileys.default || pkgBaileys
 import { Boom } from '@hapi/boom'
 import pino from 'pino'
 
@@ -32,6 +32,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 async function startBot() {
+    // Carpeta de sesión
     const { state, saveCreds } = await useMultiFileAuthState('session')
 
     const sock = makeWASocket({
@@ -39,9 +40,10 @@ async function startBot() {
         printQRInTerminal: true,
         auth: state,
         logger: pino({ level: 'silent' }),
-        browser: ['Ubuntu', 'Chrome', '20.0.04']
+        browser: ['Sηαdοωβοτ', 'Chrome', '1.0.0']
     })
 
+    // --- CARGADOR DE PLUGINS ---
     const plugins = {}
     const pluginsFolder = path.join(__dirname, 'plugins')
     if (!fs.existsSync(pluginsFolder)) fs.mkdirSync(pluginsFolder)
@@ -62,7 +64,8 @@ async function startBot() {
 
     sock.ev.on('messages.upsert', async ({ messages }) => {
         const m = messages[0]
-        if (!m || !m.message) return
+        if (!m || !m.message || m.key.fromMe) return
+        
         const from = m.key.remoteJid
         const body = (m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || '')
         const prefix = '.'
@@ -71,13 +74,14 @@ async function startBot() {
         const command = body.slice(prefix.length).trim().split(' ').shift().toLowerCase()
         const args = body.trim().split(/ +/).slice(1)
 
+        // --- EJECUTOR DE PLUGINS ---
         for (const file in plugins) {
             const p = plugins[file]
             if (p && p.command && Array.isArray(p.command) && p.command.includes(command)) {
                 try {
                     await p.run(sock, m, args)
                 } catch (e) {
-                    console.error(`❌ Error en ejecución de ${file}:`, e)
+                    console.error(`❌ Error en .${command}:`, e)
                     await sock.sendMessage(from, { text: `⚠️ Error en .${command}: ${e.message}` }, { quoted: m })
                 }
             }
@@ -88,6 +92,7 @@ async function startBot() {
         const { connection, lastDisconnect } = update
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut
+            console.log('🔄 Conexión cerrada. Reintentando:', shouldReconnect)
             if (shouldReconnect) startBot()
         } else if (connection === 'open') {
             console.log('✅ Sηαdοωβοτ conectado a WhatsApp')
