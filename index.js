@@ -2,35 +2,29 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const gradient = require('gradient-string');
 
-// Configuración básica directa
-const botName = 'Sηαdοωβοτ';
-const prefix = '.';
-
 const client = new Client({
     authStrategy: new LocalAuth(),
-        puppeteer: {
+    puppeteer: {
         headless: true,
-        executablePath: 'chromium', // Así, sin rutas largas
+        executablePath: 'chromium', 
         args: ['--no-sandbox', '--disable-setuid-sandbox']
-        }
     }
 });
 
 client.on('qr', (qr) => {
-    console.log(gradient.pastel('Generando código QR... (Aunque usaremos el de 8 dígitos)'));
+    console.log(gradient.pastel('Generando código QR...'));
     qrcode.generate(qr, { small: true });
 });
 
 client.on('ready', () => {
-    console.log(gradient.rainbow(`\n\n=== ${botName} ESTÁ ENCENDIDO ===\n`));
+    console.log(gradient.rainbow('\n\n=== BOT ENCENDIDO ===\n'));
 });
 
-// Lógica de mensajes básica
 client.on('message', async (msg) => {
-    if (msg.body === `${prefix}ping`) {
+    if (msg.body === '.ping') {
         msg.reply('pong');
     }
 });
 
-console.log(gradient.retro('Iniciando Sηαdοωβοτ... Por favor espera.'));
+console.log(gradient.retro('Iniciando Sηαdοωβοτ...'));
 client.initialize();
