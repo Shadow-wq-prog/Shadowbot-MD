@@ -8,15 +8,11 @@ const prefix = '.';
 
 const client = new Client({
     authStrategy: new LocalAuth(),
-    puppeteer: {
+        puppeteer: {
         headless: true,
-        executablePath: '/data/data/com.termux/files/usr/bin/chromium',
-        args: [
-            '--no-sandbox', 
-            '--disable-setuid-sandbox', 
-            '--disable-dev-shm-usage', 
-            '--single-process'
-        ]
+        executablePath: 'chromium', // Así, sin rutas largas
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        }
     }
 });
 
