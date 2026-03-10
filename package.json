@@ -1,0 +1,30 @@
+{
+  "name": "shadowbot",
+  "version": "1.0.0",
+  "description": "🌑 ShadowBot - Advanced WhatsApp Bot built with whatsapp-web.js",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "pm2": "pm2 start src/index.js --name shadowbot"
+  },
+  "keywords": ["whatsapp", "bot", "whatsapp-web.js", "shadowbot"],
+  "author": "ShadowBot",
+  "license": "MIT",
+  "dependencies": {
+    "whatsapp-web.js": "^1.23.0",
+    "qrcode-terminal": "^0.12.0",
+    "dotenv": "^16.3.1",
+    "axios": "^1.6.0",
+    "chalk": "^4.1.2",
+    "moment": "^2.29.4",
+    "node-cron": "^3.0.3",
+    "qrcode": "^1.5.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
