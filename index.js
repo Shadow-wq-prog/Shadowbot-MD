@@ -1,4 +1,5 @@
-const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const { Boom } = require('@hapi/boom');
 const pino = require('pino');
 const readline = require('readline');
 
@@ -17,7 +18,6 @@ async function startBot() {
         browser: ['Ubuntu', 'Chrome', '20.0.04']
     });
 
-    // --- SISTEMA DE 8 DÍGITOS ---
     if (!sock.authState.creds.registered) {
         const phoneNumber = await question('\n[!] Ingresa tu número de WhatsApp (ej: 51900000000):\n> ');
         const code = await sock.requestPairingCode(phoneNumber.trim());
@@ -27,56 +27,29 @@ async function startBot() {
     sock.ev.on('creds.update', saveCreds);
 
     sock.ev.on('connection.update', (update) => {
-        const { connection } = update;
+        const { connection, lastDisconnect } = update;
         if (connection === 'open') {
             console.log('\n=== Sηαdοωβοτ ONLINE ===\n');
         } else if (connection === 'close') {
-            startBot();
+            const shouldReconnect = (lastDisconnect?.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log('Conexión cerrada, reintentando...', shouldReconnect);
+            if (shouldReconnect) setTimeout(() => startBot(), 5000); // Espera 5 seg antes de volver
         }
     });
 
-    // --- MANEJADOR DE MENSAJES (SEPARADO) ---
     sock.ev.on('messages.upsert', async ({ messages }) => {
         const m = messages[0];
         if (!m.message) return;
-
         const from = m.key.remoteJid;
-        const body = m.message.conversation || m.message.extendedTextMessage?.text || '';
-        const budy = body.toLowerCase(); // Para que no importe si escribes en mayúsculas
+        const body = (m.message.conversation || m.message.extendedTextMessage?.text || '').toLowerCase();
 
-        // --- COMANDO: PING ---
-        if (budy === '.ping') {
-            await sock.sendMessage(from, { text: '¡Pong! 🏓 Sηαdοωβοτ está activo.' });
+        if (body === '.ping') {
+            await sock.sendMessage(from, { text: '¡Pong! 🏓 Sηαdοωβοτ vivo.' });
         }
-
-        // --- COMANDO: MENU ---
-        if (budy === '.menu') {
-            const menuText = `
-*╭──────────────*
-*│  ✨ Sηαdοωβοτ ✨*
-*╰──────────────*
-*│* 👤 *User:* @${from.split('@')[0]}
-*│* 🛠️ *Prefix:* [ . ]
-*╰──────────────*
-
-*──「 COMANDOS 」──*
-*◈ .ping* (Prueba)
-*◈ .menu* (Lista)
-*◈ .owner* (Creador)
-
-_Usa los comandos con el punto al inicio._
-            `;
-            await sock.sendMessage(from, { text: menuText.trim(), mentions: [from] });
-        }
-
-        // --- COMANDO: OWNER ---
-        if (budy === '.owner') {
-            await sock.sendMessage(from, { text: 'El creador de este bot es Fernando. 😎' });
+        if (body === '.menu') {
+            await sock.sendMessage(from, { text: '*MENU Sηαdοωβοτ*\n\n.ping\n.menu' });
         }
     });
 }
 
-console.log('--- CARGANDO Sηαdοωβοτ ---');
 startBot();
-
-        
