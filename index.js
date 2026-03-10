@@ -70,6 +70,7 @@ async function startBot() {
         const command = body.slice(prefix.length).trim().split(' ').shift().toLowerCase()
         const args = body.trim().split(/ +/).slice(1)
 
+        // --- EJECUTOR DE PLUGINS PROTEGIDO ---
         for (const file in plugins) {
             const p = plugins[file]
             if (p && p.command && Array.isArray(p.command) && p.command.includes(command)) {
