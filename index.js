@@ -1,10 +1,7 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
-const { Boom } = require('@hapi/boom');
+const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const pino = require('pino');
-const readline = require('readline');
-
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-const question = (text) => new Promise((resolve) => rl.question(text, resolve));
+const fs = require('fs');
+const path = require('path');
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('session_auth');
@@ -13,43 +10,44 @@ async function startBot() {
     const sock = makeWASocket({
         version,
         logger: pino({ level: 'silent' }),
-        printQRInTerminal: false,
         auth: state,
         browser: ['Ubuntu', 'Chrome', '20.0.04']
     });
 
-    if (!sock.authState.creds.registered) {
-        const phoneNumber = await question('\n[!] Ingresa tu número de WhatsApp (ej: 51900000000):\n> ');
-        const code = await sock.requestPairingCode(phoneNumber.trim());
-        console.log(`\nTU CÓDIGO DE VINCULACIÓN ES: \x1b[32m${code}\x1b[0m\n`);
+    // --- CARGADOR DE PLUGINS ---
+    const plugins = {};
+    const pluginsFolder = path.join(__dirname, 'plugins');
+    if (!fs.existsSync(pluginsFolder)) fs.mkdirSync(pluginsFolder);
+
+    const pluginFiles = fs.readdirSync(pluginsFolder).filter(file => file.endsWith('.js'));
+    for (const file of pluginFiles) {
+        const plugin = require(path.join(pluginsFolder, file));
+        plugins[file] = plugin;
     }
+    console.log(`[!] ${pluginFiles.length} Plugins cargados con éxito.`);
 
     sock.ev.on('creds.update', saveCreds);
-
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update;
-        if (connection === 'open') {
-            console.log('\n=== Sηαdοωβοτ ONLINE ===\n');
-        } else if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect?.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Conexión cerrada, reintentando...', shouldReconnect);
-            if (shouldReconnect) setTimeout(() => startBot(), 5000); // Espera 5 seg antes de volver
-        }
-    });
 
     sock.ev.on('messages.upsert', async ({ messages }) => {
         const m = messages[0];
         if (!m.message) return;
         const from = m.key.remoteJid;
         const body = (m.message.conversation || m.message.extendedTextMessage?.text || '').toLowerCase();
+        const prefix = '.';
 
-        if (body === '.ping') {
-            await sock.sendMessage(from, { text: '¡Pong! 🏓 Sηαdοωβοτ vivo.' });
-        }
-        if (body === '.menu') {
-            await sock.sendMessage(from, { text: '*MENU Sηαdοωβοτ*\n\n.ping\n.menu' });
+        if (!body.startsWith(prefix)) return;
+        const command = body.slice(prefix.length).trim().split(' ').shift();
+        const args = body.trim().split(/ +/).slice(1);
+
+        // Ejecutar el plugin si existe
+        for (const file in plugins) {
+            if (plugins[file].command.includes(command)) {
+                await plugins[file].run(sock, m, from, args);
+            }
         }
     });
+
+    sock.ev.on('connection.update', (up) => { if (up.connection === 'open') console.log('=== Sηαdοωβοτ ONLINE ==='); });
 }
 
 startBot();
