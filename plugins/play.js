@@ -7,7 +7,7 @@ const yts = require('yt-search');
 const axios = require('axios');
 
 module.exports = {
-  command: ['play', 'musica'],
+  command: ['play', 'musica', 'p'],
   run: async (sock, m, from, args) => {
     const text = args.join(' ');
     if (!text) return sock.sendMessage(from, { text: '✨ *Sηαdοωβοτ* - ¿Qué canción quieres?\n\n*Ejemplo:* .play Believer' }, { quoted: m });
@@ -18,40 +18,39 @@ module.exports = {
       const search = await yts(text);
       const video = search.videos[0];
 
-      if (!video) return sock.sendMessage(from, { text: '❌ No encontré nada.' });
+      if (!video) return sock.sendMessage(from, { text: '❌ No encontré resultados.' });
 
       let info = `┏━━ ✨ *Sηαdοωβοτ PLAY* ✨ ━━┓\n`;
       info += `┃ ◈ *Título:* ${video.title}\n`;
       info += `┃ ◈ *Duración:* ${video.timestamp}\n`;
-      info += `┗━━━━━━━━━━━━━━━━┛\n\n> ⏳ *Descargando audio via Sηαdοωβοτ...*`;
+      info += `┗━━━━━━━━━━━━━━━━┛\n\n> ⏳ *Enviando audio...*`;
 
       await sock.sendMessage(from, { image: { url: video.thumbnail }, caption: info }, { quoted: m });
 
-      // Usamos una API externa para evitar los bloqueos de YouTube en Termux
-      const apiUrl = `https://api.zenkey.my.id/api/download/ytmp3?url=${video.url}&apikey=zenkey`;
-      const response = await axios.get(apiUrl);
+      // Esta API es de las más resistentes actualmente
+      const apiUrl = `https://api.daxz7.xyz/api/downloader/youtube/audio?url=${video.url}`;
+      const { data } = await axios.get(apiUrl);
       
-      if (response.data.status && response.data.result.download_url) {
+      if (data.status && data.result.url) {
         await sock.sendMessage(from, { 
-          audio: { url: response.data.result.download_url }, 
+          audio: { url: data.result.url }, 
           mimetype: 'audio/mpeg', 
           ptt: false 
         }, { quoted: m });
         await sock.sendMessage(from, { react: { text: '✅', key: m.key } });
       } else {
-        throw new Error('La API de descarga falló.');
+        throw new Error('Fallo en servidor principal');
       }
 
     } catch (error) {
       console.error(error);
-      // Intento de respaldo con otra API si la primera falla
+      // Respaldo rápido con otra fuente
       try {
-          const fallbackUrl = `https://api.lolhuman.xyz/api/ytplay?apikey=GataDios&query=${encodeURIComponent(text)}`;
-          const res = await axios.get(fallbackUrl);
-          await sock.sendMessage(from, { audio: { url: res.data.result.audio.link }, mimetype: 'audio/mpeg', ptt: false }, { quoted: m });
+          const res = await axios.get(`https://api.siputzx.my.id/api/d/ytmp3?url=${encodeURIComponent(args[0] || text)}`);
+          await sock.sendMessage(from, { audio: { url: res.data.data.dl }, mimetype: 'audio/mpeg' }, { quoted: m });
           await sock.sendMessage(from, { react: { text: '✅', key: m.key } });
-      } catch (err2) {
-          await sock.sendMessage(from, { text: `❌ *Sηαdοωβοτ:* YouTube está muy pesado hoy. Intenta más tarde.` });
+      } catch (err) {
+          await sock.sendMessage(from, { text: `❌ *Sηαdοωβοτ:* Los servidores de YouTube están bloqueando la descarga. Prueba con otra canción o intenta en un momento.` });
       }
     }
   }
