@@ -1,47 +1,51 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
-const gradient = require('gradient-string');
+const { default: makeWASocket, useMultiFileAuthState, delay, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const pino = require('pino');
+const readline = require('readline');
 
-// Configuración básica
-const botName = 'Sηαdοωβοτ';
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+const question = (text) => new Promise((resolve) => rl.question(text, resolve));
 
-const client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: {
-        headless: true,
-        // Ruta exacta para que Termux encuentre el navegador que instalamos
-        executablePath: '/data/data/com.termux/files/usr/bin/chromium',
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process'
-        ]
+async function startBot() {
+    const { state, saveCreds } = await useMultiFileAuthState('session_auth');
+    const { version } = await fetchLatestBaileysVersion();
+
+    const sock = makeWASocket({
+        version,
+        logger: pino({ level: 'silent' }),
+        printQRInTerminal: false, // Desactivamos el QR
+        auth: state,
+        browser: ['Ubuntu', 'Chrome', '20.0.04']
+    });
+
+    // --- LÓGICA PARA CÓDIGO DE 8 DÍGITOS ---
+    if (!sock.authState.creds.registered) {
+        const phoneNumber = await question('\n[!] Ingresa tu número de WhatsApp (ej: 51900000000):\n> ');
+        const code = await sock.requestPairingCode(phoneNumber.trim());
+        console.log(`\nTU CÓDIGO DE VINCULACIÓN ES: \x1b[32m${code}\x1b[0m\n`);
+        console.log('Pon este código en: Dispositivos vinculados > Vincular con número de teléfono\n');
     }
-});
 
-// Mostrar código QR en la terminal
-client.on('qr', (qr) => {
-    console.log(gradient.pastel('\n[!] Escanea este código QR para vincular Sηαdοωβοτ:'));
-    qrcode.generate(qr, { small: true });
-});
+    sock.ev.on('creds.update', saveCreds);
 
-// Mensaje cuando el bot esté listo
-client.on('ready', () => {
-    console.log(gradient.rainbow(`\n\n=== ${botName} ESTÁ ENCENDIDO Y LISTO ===\n`));
-});
+    sock.ev.on('connection.update', (update) => {
+        const { connection } = update;
+        if (connection === 'open') {
+            console.log('\n=== Sηαdοωβοτ ONLINE CON ÉXITO ===\n');
+        } else if (connection === 'close') {
+            startBot();
+        }
+    });
 
-// Comando de prueba: .ping
-client.on('message', async (msg) => {
-    if (msg.body === '.ping') {
-        msg.reply('¡Pong! 🏓 El bot está funcionando correctamente.');
-    }
-});
+    sock.ev.on('messages.upsert', async ({ messages }) => {
+        const m = messages[0];
+        if (!m.message || m.key.fromMe) return;
+        const body = m.message.conversation || m.message.extendedTextMessage?.text;
+        if (body === '.ping') {
+            await sock.sendMessage(m.key.remoteJid, { text: '¡Pong! 🏓 Sηαdοωβοτ vivo.' });
+        }
+    });
+}
 
-// Inicio del bot
-console.log(gradient.retro(`\nIniciando ${botName}... Por favor, espera a que cargue el navegador.\n`));
-client.initialize();
+console.log('--- INICIANDO SISTEMA DE DÍGITOS ---');
+startBot();
         
