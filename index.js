@@ -22,9 +22,10 @@ const checkDependencies = () => {
 }
 checkDependencies()
 
-// --- IMPORTACIONES CORREGIDAS PARA NODE V25 ---
+// --- IMPORTACIONES COMPATIBLES CON NODE V25 ---
 import pkgBaileys from '@whiskeysockets/baileys'
-const { makeWASocket, useMultiFileAuthState, DisconnectReason } = pkgBaileys.default || pkgBaileys
+const makeWASocket = pkgBaileys.default || pkgBaileys
+import { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
 import { Boom } from '@hapi/boom'
 import pino from 'pino'
 
