@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState, delay, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const readline = require('readline');
 
@@ -12,17 +12,16 @@ async function startBot() {
     const sock = makeWASocket({
         version,
         logger: pino({ level: 'silent' }),
-        printQRInTerminal: false, // Desactivamos el QR
+        printQRInTerminal: false,
         auth: state,
         browser: ['Ubuntu', 'Chrome', '20.0.04']
     });
 
-    // --- LÓGICA PARA CÓDIGO DE 8 DÍGITOS ---
+    // --- SISTEMA DE 8 DÍGITOS ---
     if (!sock.authState.creds.registered) {
         const phoneNumber = await question('\n[!] Ingresa tu número de WhatsApp (ej: 51900000000):\n> ');
         const code = await sock.requestPairingCode(phoneNumber.trim());
         console.log(`\nTU CÓDIGO DE VINCULACIÓN ES: \x1b[32m${code}\x1b[0m\n`);
-        console.log('Pon este código en: Dispositivos vinculados > Vincular con número de teléfono\n');
     }
 
     sock.ev.on('creds.update', saveCreds);
@@ -30,22 +29,54 @@ async function startBot() {
     sock.ev.on('connection.update', (update) => {
         const { connection } = update;
         if (connection === 'open') {
-            console.log('\n=== Sηαdοωβοτ ONLINE CON ÉXITO ===\n');
+            console.log('\n=== Sηαdοωβοτ ONLINE ===\n');
         } else if (connection === 'close') {
             startBot();
         }
     });
 
+    // --- MANEJADOR DE MENSAJES (SEPARADO) ---
     sock.ev.on('messages.upsert', async ({ messages }) => {
         const m = messages[0];
-        if (!m.message || m.key.fromMe) return;
-        const body = m.message.conversation || m.message.extendedTextMessage?.text;
-        if (body === '.ping') {
-            await sock.sendMessage(m.key.remoteJid, { text: '¡Pong! 🏓 Sηαdοωβοτ vivo.' });
+        if (!m.message) return;
+
+        const from = m.key.remoteJid;
+        const body = m.message.conversation || m.message.extendedTextMessage?.text || '';
+        const budy = body.toLowerCase(); // Para que no importe si escribes en mayúsculas
+
+        // --- COMANDO: PING ---
+        if (budy === '.ping') {
+            await sock.sendMessage(from, { text: '¡Pong! 🏓 Sηαdοωβοτ está activo.' });
+        }
+
+        // --- COMANDO: MENU ---
+        if (budy === '.menu') {
+            const menuText = `
+*╭──────────────*
+*│  ✨ Sηαdοωβοτ ✨*
+*╰──────────────*
+*│* 👤 *User:* @${from.split('@')[0]}
+*│* 🛠️ *Prefix:* [ . ]
+*╰──────────────*
+
+*──「 COMANDOS 」──*
+*◈ .ping* (Prueba)
+*◈ .menu* (Lista)
+*◈ .owner* (Creador)
+
+_Usa los comandos con el punto al inicio._
+            `;
+            await sock.sendMessage(from, { text: menuText.trim(), mentions: [from] });
+        }
+
+        // --- COMANDO: OWNER ---
+        if (budy === '.owner') {
+            await sock.sendMessage(from, { text: 'El creador de este bot es Fernando. 😎' });
         }
     });
 }
 
-console.log('--- INICIANDO SISTEMA DE DÍGITOS ---');
+console.log('--- CARGANDO Sηαdοωβοτ ---');
 startBot();
+
         
