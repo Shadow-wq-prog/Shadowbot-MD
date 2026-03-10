@@ -22,7 +22,9 @@ const checkDependencies = () => {
 }
 checkDependencies()
 
-import { makeWASocket, useMultiFileAuthState, disconnectReason } from '@whiskeysockets/baileys'
+// IMPORTANTE: Aquí cambiamos disconnectReason por DisconnectReason (con D mayúscula)
+import pkgBaileys from '@whiskeysockets/baileys'
+const { makeWASocket, useMultiFileAuthState, DisconnectReason } = pkgBaileys
 import { Boom } from '@hapi/boom'
 import pino from 'pino'
 
@@ -40,7 +42,6 @@ async function startBot() {
         browser: ['Ubuntu', 'Chrome', '20.0.04']
     })
 
-    // --- CARGADOR DE PLUGINS ---
     const plugins = {}
     const pluginsFolder = path.join(__dirname, 'plugins')
     if (!fs.existsSync(pluginsFolder)) fs.mkdirSync(pluginsFolder)
@@ -70,7 +71,6 @@ async function startBot() {
         const command = body.slice(prefix.length).trim().split(' ').shift().toLowerCase()
         const args = body.trim().split(/ +/).slice(1)
 
-        // --- EJECUTOR DE PLUGINS PROTEGIDO ---
         for (const file in plugins) {
             const p = plugins[file]
             if (p && p.command && Array.isArray(p.command) && p.command.includes(command)) {
@@ -87,7 +87,7 @@ async function startBot() {
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update
         if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== disconnectReason.loggedOut
+            const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut
             if (shouldReconnect) startBot()
         } else if (connection === 'open') {
             console.log('✅ Sηαdοωβοτ conectado a WhatsApp')
