@@ -18,13 +18,52 @@ console.log(chalk.gray('  Iniciando...\n'));
 // ─── Cargar Comandos ───────────────────────────────────────────────────────────
 loadCommands();
 
-// ─── Cliente WhatsApp ──────────────────────────────────────────────────────────
+// ─── Detectar ruta de Chromium en Termux ──────────────────────────────────────
+function detectarChromium() {
+  const { execSync } = require('child_process');
+  const rutas = [
+    '/data/data/com.termux/files/usr/bin/chromium-browser',
+    '/data/data/com.termux/files/usr/bin/chromium',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome',
+  ];
+
+  // Intentar encontrarlo con "which"
+  try {
+    const resultado = execSync('which chromium-browser || which chromium', {
+      encoding: 'utf8',
+    }).trim();
+    if (resultado) return resultado;
+  } catch {}
+
+  // Buscar en rutas conocidas
+  const fs = require('fs');
+  for (const ruta of rutas) {
+    if (fs.existsSync(ruta)) return ruta;
+  }
+
+  return null;
+}
+
+const rutaChromium = detectarChromium();
+
+if (rutaChromium) {
+  logger.success(`Chromium encontrado en: ${rutaChromium}`);
+} else {
+  logger.warn('No se encontró Chromium. Instálalo con:');
+  console.log(chalk.yellow('\n  pkg install chromium\n'));
+  process.exit(1);
+}
+
+// ─── Cliente WhatsApp (sin descargar Chromium, usa el del sistema) ─────────────
 const client = new Client({
   authStrategy: new LocalAuth({
     dataPath: config.bot.sessionPath,
   }),
   puppeteer: {
     headless: true,
+    executablePath: rutaChromium,   // 👈 usa el Chromium de Termux
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -32,7 +71,10 @@ const client = new Client({
       '--disable-accelerated-2d-canvas',
       '--no-first-run',
       '--no-zygote',
+      '--single-process',           // 👈 importante en Termux (sin zygote)
       '--disable-gpu',
+      '--disable-extensions',
+      '--disable-software-rasterizer',
     ],
   },
 });
@@ -53,7 +95,6 @@ function pedirNumero() {
       chalk.yellow('  📱 Ingresa tu número (con código de país, sin + ni espacios)\n  Ejemplo: 521234567890\n\n  > '),
       (numero) => {
         rl.close();
-        // Limpiar el número: quitar +, espacios y guiones
         const limpio = numero.trim().replace(/[+\-\s]/g, '');
         resolve(limpio);
       }
@@ -61,7 +102,7 @@ function pedirNumero() {
   });
 }
 
-// ─── Evento: listo para vincular ──────────────────────────────────────────────
+// ─── Eventos ──────────────────────────────────────────────────────────────────
 client.on('ready', async () => {
   const info = client.info;
   console.log('');
@@ -69,12 +110,10 @@ client.on('ready', async () => {
   logger.info(`Prefijo: ${config.bot.prefix} | Anti-spam: ${config.features.antiSpam}`);
 });
 
-// ─── Evento: QR (fallback, no debería llegar aquí) ────────────────────────────
 client.on('qr', () => {
   logger.warn('Se recibió un QR inesperado. Reinicia el bot e intenta de nuevo.');
 });
 
-// ─── Evento: autenticado ──────────────────────────────────────────────────────
 client.on('authenticated', () => {
   logger.success('¡Autenticación exitosa! Sesión guardada.');
 });
@@ -84,17 +123,14 @@ client.on('auth_failure', (msg) => {
   process.exit(1);
 });
 
-// ─── Evento: desconectado ─────────────────────────────────────────────────────
 client.on('disconnected', (reason) => {
   logger.warn(`Cliente desconectado: ${reason}`);
 });
 
-// ─── Mensajes y Grupos ────────────────────────────────────────────────────────
 client.on('message', (msg) => handleMessage(client, msg));
 client.on('group_join', (notification) => handleGroupUpdate(client, notification));
 client.on('group_leave', (notification) => handleGroupUpdate(client, notification));
 
-// ─── Errores globales ─────────────────────────────────────────────────────────
 process.on('unhandledRejection', (err) => {
   logger.error(`Promesa rechazada sin manejar: ${err.message}`);
 });
@@ -104,7 +140,6 @@ process.on('uncaughtException', (err) => {
 
 // ─── Inicializar con Pairing Code ─────────────────────────────────────────────
 async function iniciar() {
-  // Solo pedir número si no hay sesión guardada
   const fs = require('fs');
   const sessionExiste = fs.existsSync(`${config.bot.sessionPath}/session`);
 
@@ -119,13 +154,10 @@ async function iniciar() {
     logger.info(`Número ingresado: +${numero}`);
     logger.info('Iniciando cliente, espera un momento...\n');
 
-    // Escuchar el evento pre_auth_code para solicitar el pairing code
     client.on('pre_auth_code', async () => {
       try {
         logger.info('Solicitando código de vinculación...');
         const codigo = await client.requestPairingCode(numero);
-
-        // Formatear el código en grupos de 4: XXXX-XXXX
         const codigoFormateado = codigo.match(/.{1,4}/g).join('-');
 
         console.log('');
@@ -151,35 +183,3 @@ async function iniciar() {
 }
 
 iniciar();
-```
-
----
-
-### 🔍 ¿Qué cambió y cómo funciona?
-
-**Flujo completo en Termux:**
-```
-🌑  SHADOWBOT  |  WhatsApp Bot
-
-┌─────────────────────────────────────────┐
-│      🔐  VINCULACIÓN POR CÓDIGO          │
-└─────────────────────────────────────────┘
-
-  📱 Ingresa tu número (con código de país, sin + ni espacios)
-  Ejemplo: 521234567890
-
-  > 521234567890
-
-[INFO]  Iniciando cliente, espera un momento...
-[INFO]  Solicitando código de vinculación...
-
-  ✅ CÓDIGO DE VINCULACIÓN OBTENIDO
-
-  Ve a WhatsApp → Dispositivos vinculados → Vincular con número
-
-  🔑 Tu código:  A1B2-C3D4 
-
-  El código expira en unos minutos. Ingrésalo rápido.
-
-[OK]    ¡Autenticación exitosa! Sesión guardada.
-[OK]    ¡Bot listo! Conectado como TuNombre (+521234567890)
