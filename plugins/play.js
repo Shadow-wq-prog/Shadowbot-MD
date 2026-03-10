@@ -4,9 +4,7 @@ Bot: Sηαdοωβοτ
 */
 
 const yts = require('yt-search');
-const ytdl = require('ytdl-core');
-const fs = require('fs');
-const path = require('path');
+const axios = require('axios');
 
 module.exports = {
   command: ['play', 'musica'],
@@ -25,44 +23,36 @@ module.exports = {
       let info = `┏━━ ✨ *Sηαdοωβοτ PLAY* ✨ ━━┓\n`;
       info += `┃ ◈ *Título:* ${video.title}\n`;
       info += `┃ ◈ *Duración:* ${video.timestamp}\n`;
-      info += `┗━━━━━━━━━━━━━━━━┛\n\n> ⏳ *Descargando audio...*`;
+      info += `┗━━━━━━━━━━━━━━━━┛\n\n> ⏳ *Descargando audio via Sηαdοωβοτ...*`;
 
       await sock.sendMessage(from, { image: { url: video.thumbnail }, caption: info }, { quoted: m });
 
-      const audioPath = path.join(__dirname, `temp_${Date.now()}.mp3`);
+      // Usamos una API externa para evitar los bloqueos de YouTube en Termux
+      const apiUrl = `https://api.zenkey.my.id/api/download/ytmp3?url=${video.url}&apikey=zenkey`;
+      const response = await axios.get(apiUrl);
       
-      const stream = ytdl(video.url, { 
-          filter: 'audioonly', 
-          quality: 'highestaudio',
-          requestOptions: {
-              headers: {
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-              }
-          }
-      });
-      
-      const file = fs.createWriteStream(audioPath);
-      stream.pipe(file);
-
-      file.on('finish', async () => {
+      if (response.data.status && response.data.result.download_url) {
         await sock.sendMessage(from, { 
-          audio: fs.readFileSync(audioPath), 
+          audio: { url: response.data.result.download_url }, 
           mimetype: 'audio/mpeg', 
           ptt: false 
         }, { quoted: m });
-
-        if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
         await sock.sendMessage(from, { react: { text: '✅', key: m.key } });
-      });
-
-      stream.on('error', (err) => {
-          console.error('Error en stream:', err);
-          if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
-      });
+      } else {
+        throw new Error('La API de descarga falló.');
+      }
 
     } catch (error) {
       console.error(error);
-      await sock.sendMessage(from, { text: `❌ *Error en Sηαdοωβοτ:* ${error.message}` });
+      // Intento de respaldo con otra API si la primera falla
+      try {
+          const fallbackUrl = `https://api.lolhuman.xyz/api/ytplay?apikey=GataDios&query=${encodeURIComponent(text)}`;
+          const res = await axios.get(fallbackUrl);
+          await sock.sendMessage(from, { audio: { url: res.data.result.audio.link }, mimetype: 'audio/mpeg', ptt: false }, { quoted: m });
+          await sock.sendMessage(from, { react: { text: '✅', key: m.key } });
+      } catch (err2) {
+          await sock.sendMessage(from, { text: `❌ *Sηαdοωβοτ:* YouTube está muy pesado hoy. Intenta más tarde.` });
+      }
     }
   }
 };
