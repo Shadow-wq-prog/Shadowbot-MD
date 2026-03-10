@@ -117,26 +117,18 @@ const rutaChromium = detectarChromium();
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
+        headless: true,
         executablePath: '/data/data/com.termux/files/usr/bin/chromium',
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process'
+        ]
     }
-}),
-  puppeteer: {
-    headless: true,
-    executablePath: rutaChromium,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--single-process',
-      '--disable-gpu',
-      '--disable-extensions',
-      '--disable-software-rasterizer',
-    ],
-  },
 });
 
 // ─── Pedir número por terminal ─────────────────────────────────────────────────
