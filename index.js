@@ -3,11 +3,28 @@ Bot: Sηαdοωβοτ
 Owner: Shadow Flash
 */
 
-import { makeWASocket, useMultiFileAuthState, disconnectReason } from '@whiskeysockets/baileys'
-import { Boom } from '@hapi/boom'
+import { execSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+
+// --- AUTO-INSTALADOR DE LIBRERÍAS ---
+const checkDependencies = () => {
+    const dependencies = ['@whiskeysockets/baileys', 'pino', 'qrcode-terminal', '@hapi/boom']
+    dependencies.forEach(dep => {
+        try {
+            import.meta.resolve(dep)
+        } catch {
+            console.log(`📦 Instalando librería faltante: ${dep}...`)
+            execSync(`npm install ${dep}`, { stdio: 'inherit' })
+        }
+    })
+}
+checkDependencies()
+
+import { makeWASocket, useMultiFileAuthState, disconnectReason } from '@whiskeysockets/baileys'
+import { Boom } from '@hapi/boom'
+import pino from 'pino'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -31,7 +48,7 @@ async function startBot() {
     const pluginFiles = fs.readdirSync(pluginsFolder).filter(file => file.endsWith('.js'))
     for (const file of pluginFiles) {
         try {
-            const plugin = await import(`./plugins/${file}`)
+            const plugin = await import(`./plugins/${file}?update=${Date.now()}`)
             plugins[file] = plugin.default || plugin
         } catch (e) {
             console.log(`❌ Error cargando plugin ${file}:`, e.message)
@@ -46,23 +63,21 @@ async function startBot() {
         const m = messages[0]
         if (!m || !m.message) return
         const from = m.key.remoteJid
-        const body = (m.message.conversation || m.message.extendedTextMessage?.text || '')
+        const body = (m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || '')
         const prefix = '.'
         
         if (!body.startsWith(prefix)) return
         const command = body.slice(prefix.length).trim().split(' ').shift().toLowerCase()
         const args = body.trim().split(/ +/).slice(1)
 
-        // --- EJECUTOR DE PLUGINS PROTEGIDO ---
         for (const file in plugins) {
             const p = plugins[file]
-            // Verificamos que el plugin tenga comandos y que coincida con lo escrito
             if (p && p.command && Array.isArray(p.command) && p.command.includes(command)) {
                 try {
                     await p.run(sock, m, args)
                 } catch (e) {
                     console.error(`❌ Error en ejecución de ${file}:`, e)
-                    sock.sendMessage(from, { text: `⚠️ Error interno en el comando .${command}` }, { quoted: m })
+                    await sock.sendMessage(from, { text: `⚠️ Error en .${command}: ${e.message}` }, { quoted: m })
                 }
             }
         }
@@ -72,7 +87,6 @@ async function startBot() {
         const { connection, lastDisconnect } = update
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== disconnectReason.loggedOut
-            console.log('Conexión cerrada, reintentando...', shouldReconnect)
             if (shouldReconnect) startBot()
         } else if (connection === 'open') {
             console.log('✅ Sηαdοωβοτ conectado a WhatsApp')
