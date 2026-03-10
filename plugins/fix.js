@@ -22,7 +22,7 @@ module.exports = {
           return sock.sendMessage(from, { text: '✨ *Sηαdοωβοτ* ya está actualizado.' });
       }
 
-      // Obtener la lista de nombres de archivos que cambiaron
+      // Obtener la lista de archivos que cambiaron
       const { stdout: filesChanged } = await execPromise('git diff --name-only HEAD..origin/main');
       await execPromise('git reset --hard origin/main');
 
