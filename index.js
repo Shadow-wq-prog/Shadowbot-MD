@@ -115,9 +115,12 @@ const rutaChromium = detectarChromium();
 
 // ─── Cliente WhatsApp ──────────────────────────────────────────────────────────
 const client = new Client({
-  authStrategy: new LocalAuth({
-    dataPath: config.bot.sessionPath,
-  }),
+    authStrategy: new LocalAuth(),
+    puppeteer: {
+        executablePath: '/data/data/com.termux/files/usr/bin/chromium',
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    }
+}),
   puppeteer: {
     headless: true,
     executablePath: rutaChromium,
