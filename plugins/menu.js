@@ -6,78 +6,79 @@ export default {
         const from = m.key.remoteJid
         const isOwnerMenu = args[0]?.toLowerCase() === 'owner'
         
-        // --- VALIDACIÓN DE OWNER ---
-        let owners = ["51983564381"] // Tu número por defecto
+        // --- DETECCIÓN DE OWNER ---
+        let owners = ["51983564381"] // Cambia por tu número
         try {
             if (fs.existsSync('./plugins/Owner/owners.json')) {
                 owners = JSON.parse(fs.readFileSync('./plugins/Owner/owners.json', 'utf-8'))
             }
         } catch (e) {}
-
         const isOwner = owners.some(num => m.sender.includes(num))
 
-        // 1. Si un NO-OWNER pone ".menu owner", el bot miente y dice que no existe
+        // 1. BLOQUEO PARA NO-OWNERS
         if (isOwnerMenu && !isOwner) {
             return sock.sendMessage(from, { 
-                text: `⚠️ El comando *.menu owner* no existe.\n\n💡 Escribe *.menu* para ver los comandos disponibles.` 
+                text: `⚠️ El comando *.menu owner* no existe.\n\n💡 Escribe *.menu* para ver la lista pública.` 
             }, { quoted: m })
         }
 
-        // 2. SI ES EL MENÚ DE OWNER (Solo para ti)
+        // 2. MENÚ PARA EL DUEÑO (Panel Secreto)
         if (isOwnerMenu && isOwner) {
             const menuOwner = `
-┏━━〔 *PANEL DE CONTROL* 〕━━━┓
-┃ 🔐 *Acceso:* Shadow Flash
-┗━━━━━━━━━━━━━━━━┛
-
-*👑 COMANDOS DE MANTENIMIENTO*
-🔹 *.fix / .update* : Sincroniza con GitHub y reinicia.
-🔹 *.autofix* : Repara archivos dañados.
-🔹 *.backup* : Envía copia de seguridad del bot.
-🔹 *.logs* : Mira la consola en tiempo real.
-🔹 *.error* : Revisa el historial de fallos.
-
-*👥 GESTIÓN DE PERMISOS*
-🔹 *.owner_add* : Añade un nuevo administrador.
-🔹 *.main-owner* : Cambia el creador principal.
-🔹 *owners.json* : Base de datos de dueños.
-
-_Para volver al menú normal escribe: .menu_`.trim()
-
+╭━━〔 🛠️ *OWNER PANEL* 〕━━╮
+┃
+┃ 📂 *MANTENIMIENTO*
+┃ 🔹 .fix / .update
+┃ 🔹 .rfix / .autofix
+┃ 🔹 .backup / .logs
+┃
+┃ 👥 *CONFIGURACIÓN*
+┃ 🔹 .owner_add
+┃ 🔹 .main-owner
+┃ 🔹 .owners.json
+┃
+┃ ⚠️ *SISTEMA*
+┃ 🔹 .error / .ia
+┃
+╰━━━━━━━━━━━━━━━╯`.trim()
             return sock.sendMessage(from, { text: menuOwner }, { quoted: m })
         }
 
-        // 3. MENÚ PÚBLICO (Lo que ven todos los usuarios)
+        // 3. MENÚ PÚBLICO (Categorías completas)
         const menuPublico = `
-┏━━〔 *Sηαdοωβοτ* 〕━━━┓
-┃ 👤 *Owner:* Shadow Flash
-┃ 📟 *Estado:* Online
-┗━━━━━━━━━━━━━━┛
-
-*🛡️ MODERACIÓN (Admins)*
-🔹 *.kick* : Elimina a un usuario del grupo.
-🔹 *.aviso* : Etiqueta a todos (invisible).
-🔹 *.tagall* : Etiqueta a todos (lista visible).
-
-*🤖 SISTEMA & IA*
-🔹 *.infobot* : Info de RAM y tiempo activo.
-🔹 *.ping* : Velocidad de respuesta.
-🔹 *.ia* : Habla con la Inteligencia Artificial.
-
-*🎨 MULTIMEDIA*
-🔹 *.sticker* : Crea stickers de fotos/videos.
-🔹 *.toimg* : Convierte sticker a imagen/video.
-🔹 *.play* : Descarga música y videos.
-
-_Shadowbot-MD - Tecnología de Shadow Flash_`.trim()
+╭━━〔 ✨ *Sηαdοωβοτ* ✨ 〕━━╮
+┃ 👤 *User:* Shadow Flash
+┃ 📟 *Plugins:* 25 cargados
+┃ ⚡ *Prefix:* [ . ]
+┣━━━━━━━━━━━━━━━┛
+┃
+┃ 🤖 *BOT INFO*
+┃ 🔹 .ping / .p
+┃ 🔹 .infobot / .status
+┃ 🔹 .runtime
+┃
+┃ 🛡️ *MODERACIÓN*
+┃ 🔹 .kick / .sacar
+┃ 🔹 .aviso / .hidetag
+┃ 🔹 .tagall / .invocar
+┃
+┃ 🎨 *MULTIMEDIA*
+┃ 🔹 .s (Sticker)
+┃ 🔹 .toimg (Sticker a Foto)
+┃ 🔹 .tovideo (Sticker a Video)
+┃ 🔹 .play (Música/YouTube)
+┃
+┃ 💡 *AYUDA*
+┃ 🔹 .menu owner (Solo Dueño)
+┃
+╰━━━━━━━━━━━━━━━╯`.trim()
 
         await sock.sendMessage(from, { 
             text: menuPublico,
             contextInfo: {
                 externalAdReply: {
-                    title: 'MENÚ DE COMANDOS',
-                    body: 'Selecciona una categoría',
-                    sourceUrl: 'https://github.com/',
+                    title: 'Sηαdοωβοτ OFICIAL',
+                    body: 'Panel de Comandos v2.0',
                     mediaType: 1,
                     showAdAttribution: true,
                     renderLargerThumbnail: false
