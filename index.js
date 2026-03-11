@@ -12,18 +12,6 @@ import readline from 'readline'
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
 const question = (text) => new Promise((resolve) => rl.question(text, resolve))
 
-// --- AUTO-INSTALADOR ---
-const checkDependencies = () => {
-    const deps = ['@whiskeysockets/baileys', 'pino', 'qrcode-terminal', '@hapi/boom']
-    deps.forEach(dep => {
-        try { import.meta.resolve(dep) } catch {
-            console.log(`📦 Instalando: ${dep}...`)
-            execSync(`npm install ${dep}`, { stdio: 'inherit' })
-        }
-    })
-}
-checkDependencies()
-
 import pkgBaileys from '@whiskeysockets/baileys'
 const makeWASocket = pkgBaileys.default || pkgBaileys
 import { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, delay } from '@whiskeysockets/baileys'
@@ -47,34 +35,28 @@ async function startBot() {
 
     if (!sock.authState.creds.registered) {
         console.log('--- VINCULACIÓN POR CÓDIGO ---')
-        const phoneNumber = await question('📝 Ingresa tu número (ej: 519XXXXXXXX):\n')
+        const phoneNumber = await question('📝 Ingresa tu número:\n')
         await delay(3000)
-        try {
-            const code = await sock.requestPairingCode(phoneNumber.trim())
-            console.log(`\n🔑 CÓDIGO DE VINCULACIÓN: \x1b[32m${code}\x1b[0m\n`)
-        } catch (err) {
-            console.log('❌ Error en vinculación. Reintenta.')
-            process.exit(1)
-        }
+        const code = await sock.requestPairingCode(phoneNumber.trim())
+        console.log(`\n🔑 CÓDIGO: \x1b[32m${code}\x1b[0m\n`)
     }
 
-    // CARGADOR DINÁMICO DE PLUGINS
     const plugins = {}
     const pluginsFolder = path.join(__dirname, 'plugins')
-    if (!fs.existsSync(pluginsFolder)) fs.mkdirSync(pluginsFolder)
 
     const loadPlugins = async (dir) => {
-        const folders = fs.readdirSync(dir)
-        for (const file of folders) {
+        const files = fs.readdirSync(dir)
+        for (const file of files) {
             const fullPath = path.join(dir, file)
             if (fs.lstatSync(fullPath).isDirectory()) {
                 await loadPlugins(fullPath)
-            } else if (file.endsWith('.js')) {
+            } else if (file.endsWith('.js') || file.endsWith('.cjs')) {
                 try {
-                    const plugin = await import(`./${path.relative(__dirname, fullPath)}?u=${Date.now()}`)
+                    // Importación dinámica que soporta ambos formatos
+                    const plugin = await import(`file://${fullPath}?u=${Date.now()}`)
                     plugins[file] = plugin.default || plugin
                 } catch (e) {
-                    console.log(`❌ Fallo en ${file}: ${e.message}`)
+                    console.log(`❌ Error en ${file}: ${e.message}`)
                 }
             }
         }
@@ -97,39 +79,22 @@ async function startBot() {
     sock.ev.on('messages.upsert', async ({ messages }) => {
         const m = messages[0]
         if (!m || !m.message) return
-
         const from = m.key.remoteJid
         const body = (m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || '')
         const prefix = '.'
         
         if (!body.startsWith(prefix)) return
-
         const args = body.slice(prefix.length).trim().split(/ +/)
         const command = args.shift().toLowerCase()
-
-        // Verificación de Dueño
-        let owners = ["51983564381"]
-        try {
-            const data = fs.readFileSync('./plugins/Owner/owners.json', 'utf-8')
-            owners = JSON.parse(data)
-        } catch (e) {}
-        
-        const isOwner = owners.some(num => from.includes(num))
 
         for (const file in plugins) {
             const p = plugins[file]
             const isMatch = Array.isArray(p.command) ? p.command.includes(command) : p.command === command
-            
             if (isMatch) {
-                if (p.isOwner && !isOwner) {
-                    return sock.sendMessage(from, { text: '❌ Solo el Owner puede usar este comando.' }, { quoted: m })
-                }
                 try {
-                    console.log(`🏃 Ejecutando: ${command} | De: ${from}`)
+                    console.log(`🏃 Ejecutando: ${command}`)
                     await p.run(sock, m, args)
-                } catch (e) {
-                    console.error(e)
-                }
+                } catch (e) { console.error(e) }
             }
         }
     })
