@@ -12,9 +12,20 @@ import readline from 'readline'
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
 const question = (text) => new Promise((resolve) => rl.question(text, resolve))
 
+// --- AUTO-INSTALADOR ---
+const checkDependencies = () => {
+    const deps = ['@whiskeysockets/baileys', 'pino', 'qrcode-terminal', '@hapi/boom']
+    deps.forEach(dep => {
+        try { import.meta.resolve(dep) } catch {
+            console.log(`📦 Instalando: ${dep}...`)
+            execSync(`npm install ${dep}`, { stdio: 'inherit' })
+        }
+    })
+}
+checkDependencies()
+
 import pkgBaileys from '@whiskeysockets/baileys'
 const makeWASocket = pkgBaileys.default || pkgBaileys
-// Añadimos 'delay' a las importaciones
 import { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, delay } from '@whiskeysockets/baileys'
 import { Boom } from '@hapi/boom'
 import pino from 'pino'
@@ -30,47 +41,47 @@ async function startBot() {
         version,
         auth: state,
         logger: pino({ level: 'silent' }),
-        browser: ['Ubuntu', 'Chrome', '20.0.04'],
+        browser: ['Sηαdοωβοτ', 'Chrome', '1.0.0'],
         printQRInTerminal: false
     })
 
     if (!sock.authState.creds.registered) {
-        console.log('--- VINCULACIÓN DE Sηαdοωβοτ ---')
-        const phoneNumber = await question('📝 Ingresa tu número de WhatsApp (ej: 519XXXXXXXX):\n')
-        
-        // --- LA SOLUCIÓN: ESPERAR 3 SEGUNDOS ---
-        console.log('⏳ Conectando con WhatsApp... espera un momento.')
-        await delay(3000) 
-        
+        console.log('--- VINCULACIÓN POR CÓDIGO ---')
+        const phoneNumber = await question('📝 Ingresa tu número (ej: 519XXXXXXXX):\n')
+        await delay(3000)
         try {
             const code = await sock.requestPairingCode(phoneNumber.trim())
-            console.log(`\n🔑 TU CÓDIGO DE VINCULACIÓN ES: \x1b[32m${code}\x1b[0m\n`)
+            console.log(`\n🔑 CÓDIGO DE VINCULACIÓN: \x1b[32m${code}\x1b[0m\n`)
         } catch (err) {
-            console.log('❌ Error al generar código. Inténtalo de nuevo en unos segundos.')
+            console.log('❌ Error en vinculación. Reintenta.')
             process.exit(1)
         }
     }
 
-    // CARGADOR DE PLUGINS (Igual que antes)
+    // CARGADOR DINÁMICO DE PLUGINS
     const plugins = {}
     const pluginsFolder = path.join(__dirname, 'plugins')
     if (!fs.existsSync(pluginsFolder)) fs.mkdirSync(pluginsFolder)
 
-    const readPlugins = (dir) => {
-        const files = fs.readdirSync(dir)
-        for (const file of files) {
+    const loadPlugins = async (dir) => {
+        const folders = fs.readdirSync(dir)
+        for (const file of folders) {
             const fullPath = path.join(dir, file)
             if (fs.lstatSync(fullPath).isDirectory()) {
-                readPlugins(fullPath)
+                await loadPlugins(fullPath)
             } else if (file.endsWith('.js')) {
-                import(`./${path.relative(__dirname, fullPath)}?u=${Date.now()}`).then(m => {
-                    plugins[file] = m.default || m
-                }).catch(e => console.log(`❌ Error en ${file}: ${e.message}`))
+                try {
+                    const plugin = await import(`./${path.relative(__dirname, fullPath)}?u=${Date.now()}`)
+                    plugins[file] = plugin.default || plugin
+                } catch (e) {
+                    console.log(`❌ Fallo en ${file}: ${e.message}`)
+                }
             }
         }
     }
-    readPlugins(pluginsFolder)
-    
+    await loadPlugins(pluginsFolder)
+    console.log(`[!] ${Object.keys(plugins).length} Plugins cargados correctamente.`)
+
     sock.ev.on('creds.update', saveCreds)
 
     sock.ev.on('connection.update', (update) => {
@@ -86,30 +97,39 @@ async function startBot() {
     sock.ev.on('messages.upsert', async ({ messages }) => {
         const m = messages[0]
         if (!m || !m.message) return
+
         const from = m.key.remoteJid
         const body = (m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || '')
         const prefix = '.'
+        
         if (!body.startsWith(prefix)) return
-        const command = body.slice(prefix.length).trim().split(' ').shift().toLowerCase()
-        const args = body.trim().split(/ +/).slice(1)
+
+        const args = body.slice(prefix.length).trim().split(/ +/)
+        const command = args.shift().toLowerCase()
 
         // Verificación de Dueño
         let owners = ["51983564381"]
         try {
-            owners = JSON.parse(fs.readFileSync('./plugins/Owner/owners.json', 'utf-8'))
+            const data = fs.readFileSync('./plugins/Owner/owners.json', 'utf-8')
+            owners = JSON.parse(data)
         } catch (e) {}
         
         const isOwner = owners.some(num => from.includes(num))
 
         for (const file in plugins) {
             const p = plugins[file]
-            if (p && p.command && p.command.includes(command)) {
+            const isMatch = Array.isArray(p.command) ? p.command.includes(command) : p.command === command
+            
+            if (isMatch) {
                 if (p.isOwner && !isOwner) {
-                    return sock.sendMessage(from, { text: '❌ Solo el owner puede usar esto.' }, { quoted: m })
+                    return sock.sendMessage(from, { text: '❌ Solo el Owner puede usar este comando.' }, { quoted: m })
                 }
                 try {
+                    console.log(`🏃 Ejecutando: ${command} | De: ${from}`)
                     await p.run(sock, m, args)
-                } catch (e) { console.error(e) }
+                } catch (e) {
+                    console.error(e)
+                }
             }
         }
     })
