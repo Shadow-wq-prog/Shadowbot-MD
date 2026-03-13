@@ -8,83 +8,67 @@ import path from 'path'
 import { execSync } from 'child_process'
 
 export default {
-  command: ['error', 'check', 'debug'],
+  command: ['error', 'debug', 'check'],
   category: 'system',
-  isOwner: true,
-  run: async (client, m, { args }) => { // <--- Agregamos el tercer parámetro
-    const from = m.key.remoteJid // Usamos el ID seguro de Baileys
+  isOwner: true, // Solo tú puedes usarlo
+  run: async (client, m, { args }) => {
+    const from = m.key.remoteJid
     
-    // Definimos las carpetas que queremos escanear para Sηαdοωβοτ
-    const directoriesToScan = [
-      path.join(process.cwd(), 'plugins'),
-      path.join(process.cwd(), 'lib')
-    ]
+    try {
+      // 1. Enviamos mensaje de inicio
+      const { key } = await client.sendMessage(from, { text: '✨ *Sηαdοωβοτ:* Iniciando diagnóstico de sistema...' }, { quoted: m })
 
-    // Mensaje inicial
-    const { key } = await client.sendMessage(from, { text: '*🔍 Sηαdοωβοτ: Iniciando escaneo de sintaxis...*' }, { quoted: m })
+      const directories = [
+        path.join(process.cwd(), 'plugins'),
+        path.join(process.cwd(), 'lib')
+      ]
 
-    const getFilesRecursively = (dir) => {
-      if (!fs.existsSync(dir)) return []
-      let results = []
-      const list = fs.readdirSync(dir)
-      list.forEach(file => {
-        const filePath = path.join(dir, file)
-        const stat = fs.statSync(filePath)
-        if (stat && stat.isDirectory()) {
-          results = results.concat(getFilesRecursively(filePath))
-        } else if (file.endsWith('.js')) {
-          results.push(filePath)
+      let allFiles = []
+      
+      // Función para listar archivos de forma segura
+      for (const dir of directories) {
+        if (fs.existsSync(dir)) {
+          const files = fs.readdirSync(dir).filter(f => f.endsWith('.js'))
+          files.forEach(f => allFiles.push(path.join(dir, f)))
         }
-      })
-      return results
-    }
-
-    let allFiles = []
-    directoriesToScan.forEach(dir => {
-      allFiles = allFiles.concat(getFilesRecursively(dir))
-    })
-
-    let errorsFound = []
-
-    // Editamos el mensaje para mostrar progreso
-    await client.sendMessage(from, { 
-      text: `Analizando *${allFiles.length}* archivos de sistema...`, 
-      edit: key 
-    })
-
-    for (const filePath of allFiles) {
-      const fileName = path.relative(process.cwd(), filePath)
-      try {
-        // Verifica si el código JS tiene errores sin ejecutarlo
-        execSync(`node --check "${filePath}"`, { stdio: 'pipe' })
-      } catch (e) {
-        const fullError = e.stderr?.toString() || e.message
-        const cleanError = fullError.split('\n').slice(0, 5).join('\n') 
-
-        errorsFound.push({
-          file: fileName,
-          detail: cleanError.trim()
-        })
       }
-    }
 
-    if (errorsFound.length === 0) {
-      await client.sendMessage(from, { 
-        text: `*✅ ¡Análisis completo de Sηαdοωβοτ!*\n\nSe revisaron *${allFiles.length}* archivos y todo está en orden.`, 
-        edit: key 
-      })
-    } else {
-      let report = `*⚠️ ERRORES DETECTADOS EN Sηαdοωβοτ*\n\n`
+      await client.sendMessage(from, { text: `🔍 Analizando *${allFiles.length}* archivos clave...`, edit: key })
 
-      errorsFound.forEach((err, i) => {
-        report += `*${i + 1}. Archivo:* \`${err.file}\`\n`
-        report += `*Error:*\n\`\`\`\n${err.detail}\n\`\`\`\n`
-        report += `──────────────\n`
-      })
+      let errorsFound = []
 
-      report += `\n*Total de fallos:* ${errorsFound.length}`
+      // 2. Escaneo de sintaxis con Node
+      for (const filePath of allFiles) {
+        const fileName = path.relative(process.cwd(), filePath)
+        try {
+          execSync(`node --check "${filePath}"`, { stdio: 'pipe' })
+        } catch (e) {
+          const fullError = e.stderr?.toString() || e.message
+          errorsFound.push({
+            file: fileName,
+            detail: fullError.split('\n').slice(0, 3).join('\n') // Solo lo más importante
+          })
+        }
+      }
 
-      await client.sendMessage(from, { text: report, edit: key })
+      // 3. Resultado final
+      if (errorsFound.length === 0) {
+        await client.sendMessage(from, { 
+          text: `✅ *Sηαdοωβοτ está limpio.*\n\nSe analizaron ${allFiles.length} archivos y no se encontraron errores de sintaxis.`, 
+          edit: key 
+        })
+      } else {
+        let report = `⚠️ *ERRORES ENCONTRADOS*\n\n`
+        errorsFound.forEach((err, i) => {
+          report += `*${i + 1}.* \`${err.file}\`\n\`\`\`${err.detail}\`\`\`\n──────────────\n`
+        })
+        await client.sendMessage(from, { text: report, edit: key })
+      }
+
+    } catch (globalError) {
+      // Si el comando mismo falla, esto te avisará por qué
+      console.error(globalError)
+      await client.sendMessage(from, { text: `❌ *Fallo crítico en el comando error:* \n${globalError.message}` }, { quoted: m })
     }
   }
 }
