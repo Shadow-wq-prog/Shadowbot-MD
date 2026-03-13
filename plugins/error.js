@@ -1,4 +1,3 @@
-
 /*
 Creador: Shadow Flash
 Bot: Sηαdοωβοτ
@@ -12,14 +11,17 @@ export default {
   command: ['error', 'check', 'debug'],
   category: 'system',
   isOwner: true,
-  run: async (client, m) => {
+  run: async (client, m, { args }) => { // <--- Agregamos el tercer parámetro
+    const from = m.key.remoteJid // Usamos el ID seguro de Baileys
+    
     // Definimos las carpetas que queremos escanear para Sηαdοωβοτ
     const directoriesToScan = [
       path.join(process.cwd(), 'plugins'),
       path.join(process.cwd(), 'lib')
     ]
 
-    const { key } = await client.sendMessage(m.chat, { text: '*🔍 Sηαdοωβοτ: Iniciando escaneo de sintaxis...*' }, { quoted: m })
+    // Mensaje inicial
+    const { key } = await client.sendMessage(from, { text: '*🔍 Sηαdοωβοτ: Iniciando escaneo de sintaxis...*' }, { quoted: m })
 
     const getFilesRecursively = (dir) => {
       if (!fs.existsSync(dir)) return []
@@ -44,7 +46,8 @@ export default {
 
     let errorsFound = []
 
-    await client.sendMessage(m.chat, { 
+    // Editamos el mensaje para mostrar progreso
+    await client.sendMessage(from, { 
       text: `Analizando *${allFiles.length}* archivos de sistema...`, 
       edit: key 
     })
@@ -56,7 +59,7 @@ export default {
         execSync(`node --check "${filePath}"`, { stdio: 'pipe' })
       } catch (e) {
         const fullError = e.stderr?.toString() || e.message
-        const cleanError = fullError.split('\n').slice(0, 5).join('\n') // Solo los primeros 5 renglones para no saturar
+        const cleanError = fullError.split('\n').slice(0, 5).join('\n') 
 
         errorsFound.push({
           file: fileName,
@@ -66,7 +69,7 @@ export default {
     }
 
     if (errorsFound.length === 0) {
-      await client.sendMessage(m.chat, { 
+      await client.sendMessage(from, { 
         text: `*✅ ¡Análisis completo de Sηαdοωβοτ!*\n\nSe revisaron *${allFiles.length}* archivos y todo está en orden.`, 
         edit: key 
       })
@@ -81,11 +84,7 @@ export default {
 
       report += `\n*Total de fallos:* ${errorsFound.length}`
 
-      try {
-        await client.sendMessage(m.chat, { text: report, edit: key })
-      } catch {
-        await m.reply(report)
-      }
+      await client.sendMessage(from, { text: report, edit: key })
     }
   }
 }
