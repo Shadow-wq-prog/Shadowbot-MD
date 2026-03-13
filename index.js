@@ -1,22 +1,55 @@
-import { makeWASocket, useMultiFileAuthState } from '@whiskeysockets/baileys'
+import { 
+    makeWASocket, 
+    useMultiFileAuthState, 
+    DisconnectReason, 
+    fetchLatestBaileysVersion 
+} from '@whiskeysockets/baileys';
+import { Boom } from '@hapi/boom';
+import qrcode from 'qrcode-terminal';
+import pino from 'pino';
+import fs from 'fs';
 
-async function start() {
-    const { state, saveCreds } = await useMultiFileAuthState('sessions')
-    
+async function startShadow() {
+    // 📂 Carpeta de sesión limpia
+    const { state, saveCreds } = await useMultiFileAuthState('./sessions');
+    const { version } = await fetchLatestBaileysVersion();
+
     const sock = makeWASocket({
+        version,
+        logger: pino({ level: 'silent' }),
+        printQRInTerminal: false, // Lo ponemos en false para usar la librería manual
         auth: state,
-        printQRInTerminal: true, // <--- ESTA LÍNEA DEBE SER TRUE
-        browser: ['Shadowbot', 'Chrome', '1.0.0']
-    })
+        browser: ['Sηαdοωβοτ', 'Chrome', '1.0.0']
+    });
 
-    sock.ev.on('creds.update', saveCreds)
-
+    // 🔄 Manejo de conexión y generación de QR
     sock.ev.on('connection.update', (update) => {
-        const { connection, qr } = update
+        const { connection, lastDisconnect, qr } = update;
+
+        // --- AQUÍ SE GENERA EL QR ---
         if (qr) {
-            console.log("📢 ¡CÓDIGO QR GENERADO! ESCANEA AHORA:")
+            console.clear();
+            console.log('╔════════════════════════════════════╗');
+            console.log('║   📱 ESCANEA EL QR DE Sηαdοωβοτ   ║');
+            console.log('╚════════════════════════════════════╝');
+            qrcode.generate(qr, { small: true }); // Dibuja el QR en formato pequeño
+            console.log('💡 Tip: Aleja el zoom de Termux si se ve mal.');
         }
-        if (connection === 'open') console.log("✅ CONECTADO")
-    })
+
+        if (connection === 'close') {
+            const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
+            if (shouldReconnect) startShadow();
+        } else if (connection === 'open') {
+            console.log('✅ Sηαdοωβοτ CONECTADO CON ÉXITO');
+        }
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+
+    // Cargador básico de mensajes para que no dé error
+    sock.ev.on('messages.upsert', async (m) => {
+        // Tu lógica de plugins aquí
+    });
 }
-start()
+
+startShadow().catch(err => console.error("Error global:", err));
