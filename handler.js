@@ -1,76 +1,65 @@
-
 /*
 Creador: Shadow Flash
-Bot: Sηαdοωβοτ
+Bot: Sηαdοωβοτ (Handler Optimizado)
 */
 
-import moment from 'moment-timezone';
-import chalk from 'chalk';
-import fs from 'fs';
-import path from 'path';
-import initDB from './lib/system/initDB.js';
-import { smsg } from './lib/message.js';
+import { smsg } from './lib/message.js'
+import chalk from 'chalk'
+import fs from 'fs'
 
-export default async (client, m, chatUpdate) => {
-  if (!m) return;
-  if (m.isBaileys) return; // Ignorar mensajes del propio bot
-
-  const selfId = client.user.id.split(':')[0] + '@s.whatsapp.net';
-  const ownerNumber = '51983564381@s.whatsapp.net';
-
-  try {
-    // 1. Inicializar Base de Datos
+export default async function handler(sock, m, chatUpdate) {
+    if (!m) return
     try {
-      initDB(m, client);
+        // Cargar base de datos
+        let user = global.db.data.users[m.sender]
+        if (typeof user !== 'object') global.db.data.users[m.sender] = {}
+        if (user) {
+            if (!('name' in user)) user.name = m.name
+            if (!('premium' in user)) user.premium = false
+            if (!('limit' in user)) user.limit = 10
+        } else {
+            global.db.data.users[m.sender] = {
+                name: m.name,
+                premium: false,
+                limit: 10,
+            }
+        }
+
+        // --- SEGURIDAD PARA EL SPLIT ---
+        // Esto evita el error "Cannot read properties of undefined (reading 'split')"
+        const isROwner = [sock.decodeJid(sock.user.id), ...global.owner.map(([number]) => number)].map(v => v?.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender)
+        const isOwner = isROwner || m.fromMe
+        
+        // Prefijo y Comandos
+        let usedPrefix = (global.prefix || '.').charAt(0)
+        let isCmd = m.body && m.body.startsWith(usedPrefix)
+        let command = isCmd ? m.body.slice(usedPrefix.length).trim().split(' ').shift().toLowerCase() : ''
+
+        if (isCmd) {
+            // Buscador dinámico de plugins
+            let plugin = Object.values(global.plugins).find(p => p.command && (Array.isArray(p.command) ? p.command.includes(command) : p.command === command))
+            
+            if (plugin) {
+                // Verificar si el comando es solo para dueños
+                if (plugin.rowner && !isROwner) {
+                    m.reply(global.mess.owner)
+                    return
+                }
+                
+                // Ejecutar comando
+                await plugin(m, { sock, client: sock, usedPrefix, command, isOwner, isROwner })
+            }
+        }
+
     } catch (e) {
-      console.error(chalk.red(`[ ERROR DB ] →`), e);
+        console.error(chalk.red(`[ ERROR HANDLER ] →`), e)
+        // No enviamos el error al chat para evitar spam de errores
     }
+}
 
-    // 2. Configuración de Prefijos y Nombre
-    const settings = global.db.data.settings[selfId] || {};
-    const botName = settings.namebot2 || 'Sηαdοωβοτ';
-    const prefas = settings.prefijo || ['.', '/', '#', '!'];
-    
-    // Detectar si el mensaje usa un prefijo válido
-    const isPrefix = prefas.find(p => m.body.startsWith(p));
-    const prefix = isPrefix ? isPrefix : null;
-
-    // 3. Log de Consola (Tu estilo personalizado)
-    if (m.message && prefix) {
-      console.log(chalk.cyan('𝄢 · • —– ٠ ✤ ٠ —– • · · • —– ٠ ✤ ٠ —– • ·✧༄'));
-      console.log(`${chalk.green('𝐔𝐒𝐔𝐀𝐑𝐈𝐎 ❱❱')} ${chalk.white(m.pushName || 'User')}`);
-      console.log(`${chalk.green('𝐂𝐎𝐌𝐀𝐍𝐃𝐎 ❱❱')} ${chalk.yellow(m.body)}`);
-      console.log(`${chalk.green('𝐆𝐑𝐔𝐏𝐎 ❱❱')} ${chalk.white(m.isGroup ? m.chat : 'Chat Privado')}`);
-      console.log(chalk.cyan('𝄢 · • —– ٠ ✤ ٠ —– • · · • —– ٠ ✤ ٠ —– • ·✧༄'));
-    }
-
-    if (!prefix) return;
-
-    // 4. Variables de Comando
-    const args = m.body.slice(prefix.length).trim().split(/ +/);
-    const command = args.shift()?.toLowerCase();
-    const text = args.join(' ');
-    const isOwner = m.sender === ownerNumber || m.fromMe;
-
-    // 5. Ejecución de Plugins (Comandos Importantes)
-    const plugin = global.plugins[command] || Object.values(global.plugins).find(p => p.command && p.command.includes(command));
-
-    if (plugin) {
-      // Validaciones de seguridad
-      if (plugin.isOwner && !isOwner) {
-        return m.reply('❌ Este comando es exclusivo de Shadow Flash.');
-      }
-
-      // Ejecutar el comando
-      try {
-        await plugin.run(client, m, { args, text, prefix, command });
-      } catch (err) {
-        console.error(chalk.red(`[ PLUGIN ERROR ] → ${command}`), err);
-        m.reply('🌱 Hubo un error interno al ejecutar este comando.');
-      }
-    }
-
-  } catch (e) {
-    console.error(chalk.red(`[ MASTER HANDLER ERROR ]`), e);
-  }
-};
+// Watcher para recargar plugins en caliente
+let file = import.meta.url
+fs.watchFile(file, () => {
+    fs.unwatchFile(file)
+    console.log(chalk.blueBright(`[ INFO ] Handler.js actualizado`))
+})
