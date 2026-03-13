@@ -1,4 +1,3 @@
-rm index.js && cat <<'EOF' > index.js
 import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } from "@whiskeysockets/baileys";
 import pino from "pino";
 import readlineSync from "readline-sync";
@@ -29,4 +28,3 @@ async function startShadow() {
     sock.ev.on("creds.update", saveCreds);
 }
 startShadow().catch(console.error);
-EOF
