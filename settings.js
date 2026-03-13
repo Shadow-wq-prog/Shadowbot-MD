@@ -45,9 +45,12 @@ global.mess = {
   private: '《✧》 Este comando solo funciona en Chats Privados.'
 }
 
+// COMENTA O ELIMINA ESTO PARA DETENER EL SPAM:
+/*
 let file = import.meta.url
 fs.watchFile(file, () => {
   fs.unwatchFile(file)
   console.log(chalk.redBright(`Update 'settings.js'`))
   import(`${file}?update=${Date.now()}`)
 })
+*/
