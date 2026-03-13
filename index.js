@@ -16,24 +16,14 @@ import { fileURLToPath } from 'url';
 import readlineSync from "readline-sync";
 import boxen from 'boxen';
 import cfonts from 'cfonts';
-import { exec } from "child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- PERSONALIZACIÓN ---
 const botName = "Sηαdοωβοτ";
 const ownerName = "Shadow Flash";
 const prefix = '|';
 
-const log = {
-  info: (msg) => console.log(chalk.bgBlue.white.bold(` INFO `), chalk.white(msg)),
-  success: (msg) => console.log(chalk.bgGreen.white.bold(` SUCCESS `), chalk.greenBright(msg)),
-  warn: (msg) => console.log(chalk.bgYellowBright.black.bold(` WARNING `), chalk.yellow(msg)),
-  error: (msg) => console.log(chalk.bgRed.white.bold(` ERROR `), chalk.redBright(msg)),
-};
-
-// --- DISEÑO DE INICIO ---
 console.clear();
 cfonts.say('Shadow|Bot', {
   font: 'block',
@@ -41,26 +31,17 @@ cfonts.say('Shadow|Bot', {
   gradient: ['blue', 'magenta']
 });
 
-console.log(chalk.bold.rgb(100, 100, 255)(boxen(`Creado por: ${ownerName}\nBot: ${botName}\nEstado: Configurando entorno...`, {padding: 1, margin: 1, borderStyle: 'double', borderColor: 'blue', title: '亗 SYSTEM 亗'})));
-
-// --- MÉTODO DE VINCULACIÓN ---
 let usarCodigo = false;
 let numero = "";
 
 if (!fs.existsSync(`./sessions/creds.json`)) {
   console.log(chalk.bold.cyan(`╭───────────────────────────────────────────╮`));
   console.log(chalk.bold.cyan(`│`) + chalk.bold.yellow(`       MÉTODO DE VINCULACIÓN SELECCIONADO     `) + chalk.bold.cyan(`│`));
-  console.log(chalk.bold.cyan(`├───────────────────────────────────────────┤`));
-  console.log(chalk.bold.cyan(`│`) + chalk.white(`  1. Código QR                              `) + chalk.bold.cyan(`│`));
-  console.log(chalk.bold.cyan(`│`) + chalk.white(`  2. Código de 8 dígitos (Recomendado)      `) + chalk.bold.cyan(`│`));
   console.log(chalk.bold.cyan(`╰───────────────────────────────────────────╯`));
-  
-  const opcion = readlineSync.question(chalk.bold.magentaBright('---> Elija una opción: '));
+  const opcion = readlineSync.question(chalk.bold.magentaBright('---> Elija 1 (QR) o 2 (Código): '));
   usarCodigo = (opcion === "2");
-
   if (usarCodigo) {
-    numero = readlineSync.question(chalk.bold.greenBright('\nIngresa tu número de WhatsApp (ej: 519XXXXXXXX):\n---> '));
-    numero = numero.replace(/\D/g, "");
+    numero = readlineSync.question(chalk.bold.greenBright('\nIngresa tu número (ej: 519XXXXXXXX):\n---> ')).replace(/\D/g, "");
   }
 }
 
@@ -79,35 +60,53 @@ async function startShadow() {
     }
   });
 
-  // --- SOLICITAR CÓDIGO SI ES NECESARIO ---
   if (usarCodigo && !sock.authState.creds.registered) {
     _setTimeout(async () => {
       try {
         const pairingCode = await sock.requestPairingCode(numero);
-        const codeDisplay = pairingCode?.match(/.{1,4}/g)?.join("-") || pairingCode;
-        console.log(boxen(chalk.bold.white(`TU CÓDIGO DE VINCULACIÓN:\n\n`) + chalk.bold.bgBlue.white(` ${codeDisplay} `), {padding: 1, borderColor: 'yellow', borderStyle: 'round'}));
-      } catch (e) {
-        log.error("Error al solicitar código: " + e.message);
-      }
+        console.log(boxen(chalk.bold.white(`TU CÓDIGO:\n\n`) + chalk.bold.bgBlue.white(` ${pairingCode} `), {padding: 1, borderColor: 'yellow'}));
+      } catch (e) { console.log("Error al generar código."); }
     }, 3000);
   }
 
-  // --- CARGADOR DE PLUGINS ---
   const plugins = {};
   const loadPlugins = async () => {
     const folder = path.join(__dirname, 'plugins');
     if (!fs.existsSync(folder)) fs.mkdirSync(folder);
-    const files = fs.readdirSync(folder).filter(f => f.endsWith('.js'));
+    const files = fs.readdirSync(folder).filter(f => f.endsWith('.js') || f.endsWith('.cjs'));
     for (const file of files) {
       try {
         const module = await import(`./plugins/${file}?u=${Date.now()}`);
         plugins[file] = module.default;
-      } catch (e) { log.error(`Error en plugin ${file}: ${e.message}`); }
+      } catch (e) { console.log(`Error en plugin ${file}`); }
     }
-    log.success(`${Object.keys(plugins).length} Plugins cargados correctamente.`);
   };
   await loadPlugins();
 
-  // --- MANEJO DE MENSAJES ---
   sock.ev.on("messages.upsert", async ({ messages }) => {
-    const m = messages
+    const m = messages[0];
+    if (!m || !m.message || m.key.fromMe) return;
+    const body = m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || '';
+    if (body.startsWith(prefix)) {
+      const args = body.slice(prefix.length).trim().split(/ +/);
+      const command = args.shift().toLowerCase();
+      for (const name in plugins) {
+        const p = plugins[name];
+        if (p.command?.includes(command)) {
+          try { await p.run(sock, m, { args, prefix, command }); } catch (err) { console.error(err); }
+        }
+      }
+    }
+  });
+
+  sock.ev.on("connection.update", (update) => {
+    const { qr, connection } = update;
+    if (qr && !usarCodigo) qrcode.generate(qr, { small: true });
+    if (connection === "open") console.log(chalk.bold.green(`\n✅ ${botName} ONLINE`));
+    if (connection === "close") startShadow();
+  });
+
+  sock.ev.on("creds.update", saveCreds);
+}
+startShadow();
+EOF
