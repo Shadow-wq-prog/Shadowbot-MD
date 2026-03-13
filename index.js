@@ -6,10 +6,6 @@ import {
 import pino from 'pino';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 async function startShadow() {
     const { state, saveCreds } = await useMultiFileAuthState('./sessions');
@@ -20,52 +16,43 @@ async function startShadow() {
         printQRInTerminal: true,
         auth: state,
         logger: pino({ level: 'silent' }),
-        browser: ['Sηαdοωβοτ', 'Safari', '1.0.0']
+        browser: ['Sηαdοωβοτ', 'Chrome', '1.0.0']
     });
 
     sock.ev.on('creds.update', saveCreds);
-
-    // --- CARGADOR DE PLUGINS ---
-    const pluginsFolder = path.join(__dirname, 'plugins');
-    const plugins = {};
-
-    const loadPlugins = async () => {
-        const files = fs.readdirSync(pluginsFolder);
-        for (const file of files) {
-            if (file.endsWith('.js')) {
-                const pluginPath = `./plugins/${file}`;
-                const plugin = await import(`${pluginPath}?update=${Date.now()}`);
-                plugins[file] = plugin.default;
-            }
-        }
-        console.log(`✅ ${Object.keys(plugins).length} Plugins cargados.`);
-    };
-
-    await loadPlugins();
 
     // --- MANEJO DE MENSAJES ---
     sock.ev.on('messages.upsert', async (chatUpdate) => {
         const m = chatUpdate.messages[0];
         if (!m.message || m.key.fromMe) return;
 
-        const messageContent = m.message.conversation || m.message.extendedTextMessage?.text || '';
+        // Captura el texto del mensaje
+        const body = m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || '';
         
-        // DEFINIR PREFIJO
+        // EL PREFIJO QUE ELEGISTE
         const prefix = '|'; 
-        
-        if (!messageContent.startsWith(prefix)) return;
 
-        const args = messageContent.slice(prefix.length).trim().split(/ +/);
-        const commandName = args.shift().toLowerCase();
+        // Si el mensaje empieza con el prefijo
+        if (body.startsWith(prefix)) {
+            const args = body.slice(prefix.length).trim().split(/ +/);
+            const command = args.shift().toLowerCase();
 
-        // BUSCAR Y EJECUTAR COMANDO
-        for (const filename in plugins) {
-            const plugin = plugins[filename];
-            if (plugin.command && (plugin.command.includes(commandName))) {
-                try {
-                    await plugin.run(sock, m, args);
-                } catch (err) {
-                    console.error(`Error en comando ${commandName}:`, err);
+            console.log(`🚀 Comando detectado: ${command} con prefijo ${prefix}`);
+
+            // --- LÓGICA DE PRUEBA RÁPIDA ---
+            if (command === 'p' || command === 'ping') {
+                await sock.sendMessage(m.key.remoteJid, { text: '✨ *¡Sηαdοωβοτ Online!* ⚡' }, { quoted: m });
+            }
+
+            // Aquí el bot buscará en tu carpeta plugins automáticamente
+            const pluginsFolder = './plugins';
+            const files = fs.readdirSync(pluginsFolder);
+            for (const file of files) {
+                if (file.endsWith('.js')) {
+                    const plugin = await import(`./plugins/${file}?u=${Date.now()}`);
+                    if (plugin.default.command?.includes(command)) {
+                        await plugin.default.run(sock, m, args);
+                    }
                 }
             }
         }
@@ -73,7 +60,7 @@ async function startShadow() {
 
     sock.ev.on('connection.update', (update) => {
         const { connection } = update;
-        if (connection === 'open') console.log('✅ Sηαdοωβοτ ONLINE con prefijo [ | ]');
+        if (connection === 'open') console.log('✅ Sηαdοωβοτ conectado con prefijo [ | ]');
     });
 }
 
