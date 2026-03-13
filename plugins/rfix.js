@@ -3,13 +3,14 @@ Creador: Shadow Flash
 Bot: Sηαdοωβοτ
 */
 
-const { exec } = require('child_process');
-const { promisify } = require('util');
+import { exec } from 'child_process';
+import { promisify } from 'util';
 const execPromise = promisify(exec);
 
-module.exports = {
+export default {
   command: ['rfix', 'rupdate'],
-  run: async (sock, m, from) => {
+  run: async (sock, m, { args }) => { // Parámetros corregidos
+    const from = m.key.remoteJid;
     try {
       await sock.sendMessage(from, { react: { text: '⚙️', key: m.key } });
 
