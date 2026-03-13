@@ -11,7 +11,7 @@ export default async function handler(sock, m, chatUpdate) {
 
         if (!global.plugins || Object.keys(global.plugins).length === 0) return
 
-        const prefix = global.prefix || '/' // Cambié a / porque vi tus capturas
+        const prefix = global.prefix || '/' 
         const isCmd = m.body && m.body.startsWith(prefix)
         const command = isCmd ? m.body.slice(prefix.length).trim().split(' ').shift().toLowerCase() : ''
 
@@ -24,17 +24,17 @@ export default async function handler(sock, m, chatUpdate) {
                 let run = typeof plugin === 'function' ? plugin : plugin.run || plugin.default
                 
                 if (typeof run === 'function') {
-                    // --- AQUÍ ESTÁ EL TRUCO PARA QUE NO FALLE ---
                     const text = m.body.slice(prefix.length + command.length).trim()
                     const args = text.split(' ').filter(v => v)
 
+                    // Enviamos sock como client y conn para que NINGÚN plugin falle
                     await run(m, { 
                         sock, 
-                        conn: sock,     // Lo enviamos como conn
-                        client: sock,   // Y también como client para que no falle ningún plugin
+                        conn: sock,     
+                        client: sock,   
                         usedPrefix: prefix, 
                         command, 
-                        args,           // Enviamos los args ya procesados
+                        args,           
                         text, 
                         isOwner
                     })
