@@ -1,7 +1,7 @@
 import chalk from 'chalk'
 
 export default async function handler(sock, m, chatUpdate) {
-    if (!m) return
+    if (!m || !m.message) return
     
     try {
         const sender = m.sender?.split('@')?.[0] || '0'
@@ -11,31 +11,30 @@ export default async function handler(sock, m, chatUpdate) {
 
         if (!global.plugins || Object.keys(global.plugins).length === 0) return
 
-        const prefix = global.prefix || '/'
+        const prefix = global.prefix || '/' 
         const isCmd = m.body && m.body.startsWith(prefix)
         const command = isCmd ? m.body.slice(prefix.length).trim().split(' ').shift().toLowerCase() : ''
 
         if (isCmd) {
-            let plugin = Object.values(global.plugins).find(p => 
+            let plugin = global.plugins[command] || Object.values(global.plugins).find(p => 
                 p && p.command && (Array.isArray(p.command) ? p.command.includes(command) : p.command === command)
             )
 
             if (plugin) {
-                // Buscamos la función ejecutable
                 let run = typeof plugin === 'function' ? plugin : plugin.run || plugin.default
                 
                 if (typeof run === 'function') {
                     const text = m.body.slice(prefix.length + command.length).trim()
-                    const args = text.split(' ').filter(v => v)
+                    const args = text.split(' ').filter(v => v) || []
 
-                    // Blindaje total: pasamos el objeto de parámetros
+                    // --- LLAMADA PROTEGIDA ---
                     await run(m, { 
                         sock, 
                         conn: sock, 
                         client: sock, 
                         usedPrefix: prefix, 
                         command, 
-                        args, // Si esto falta, el destructuring falla
+                        args, // Esto ya no puede ser undefined
                         text, 
                         isOwner 
                     })
