@@ -3,13 +3,15 @@ Creador: Shadow Flash
 Bot: Sηαdοωβοτ
 */
 
-const { exec } = require('child_process');
-const { promisify } = require('util');
+import { exec } from 'child_process';
+import { promisify } from 'util';
 const execPromise = promisify(exec);
 
-module.exports = {
+export default {
   command: ['fix', 'update'],
-  run: async (sock, m, from) => {
+  run: async (sock, m, { prefix, command }) => {
+    const from = m.key.remoteJid;
+    
     try {
       await sock.sendMessage(from, { react: { text: '⏳', key: m.key } });
 
@@ -26,18 +28,20 @@ module.exports = {
       const { stdout: filesChanged } = await execPromise('git diff --name-only HEAD..origin/main');
       await execPromise('git reset --hard origin/main');
 
-      const fileList = filesChanged.trim().split('\n').map(f => `• ${f}`).join('\n');
-      const total = filesChanged.trim().split('\n').length;
+      const files = filesChanged.trim().split('\n');
+      const fileList = files.map(f => `• ${f}`).join('\n');
+      const total = files.length;
 
       let msg = `*亗 Sηαdοωβοτ Actualizado*\n\n`;
       msg += `*Owner:* Shadow Flash\n`;
       msg += `*Cambios:* ${total}\n\n`;
       msg += `*Archivos modificados:*\n${fileList}\n\n`;
-      msg += `> Reinstalando componentes...`;
+      msg += `> Reinstalando componentes y reiniciando...`;
 
       await sock.sendMessage(from, { text: msg }, { quoted: m });
       await sock.sendMessage(from, { react: { text: '✅', key: m.key } });
 
+      // Reinicio automático para aplicar cambios
       setTimeout(() => { process.exit(); }, 3000);
 
     } catch (error) {
