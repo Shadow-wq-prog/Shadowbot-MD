@@ -1,4 +1,3 @@
-
 /*
 Creador: Shadow Flash
 Bot: Sηαdοωβοτ
@@ -76,4 +75,17 @@ export default async (client, m) => {
                     }
 
                     if (anu.action === 'demote' && (!primaryBotId || primaryBotId === botId)) {
-                        const usuario =
+                        const usuario = anu.author || 'Sistema'
+                        await client.sendMessage(anu.id, {
+                            text: `「✎」 *@${phone}* ya no es Administrador.\nAcción realizada por: *@${usuario.split('@')[0]}*`,
+                            mentions: [jid, usuario]
+                        })
+                    }
+                }
+            } catch (err) {
+                console.error(chalk.red(`[ EVENTS ERROR ] →`), err)
+            }
+        })
+        client._groupParticipantsRegistered = true
+    }
+}
