@@ -24,17 +24,17 @@ export default async function handler(sock, m, chatUpdate) {
                 let run = typeof plugin === 'function' ? plugin : plugin.run || plugin.default
                 
                 if (typeof run === 'function') {
+                    // --- AQUÍ ESTÁ LA SOLUCIÓN AL ERROR DE ARGS ---
                     const text = m.body.slice(prefix.length + command.length).trim()
-                    const args = text.split(' ').filter(v => v)
+                    const args = text.split(' ').filter(v => v) || [] 
 
-                    // Enviamos sock como client y conn para que NINGÚN plugin falle
                     await run(m, { 
                         sock, 
                         conn: sock,     
                         client: sock,   
                         usedPrefix: prefix, 
                         command, 
-                        args,           
+                        args: args, // Enviamos los args explícitamente
                         text, 
                         isOwner
                     })
