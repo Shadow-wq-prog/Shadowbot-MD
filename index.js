@@ -1,4 +1,4 @@
-cat <<EOF > index.js
+cat <<'EOF' > index.js
 import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import qrcode from 'qrcode-terminal';
@@ -19,7 +19,7 @@ async function startShadow() {
         logger: pino({ level: 'silent' }),
         printQRInTerminal: false,
         auth: state,
-        browser: ['Sηαdοωβοτ', 'Chrome', '1.0.0']
+        browser: ['ShadowBot', 'Chrome', '1.0.0']
     });
 
     const plugins = {};
@@ -29,12 +29,12 @@ async function startShadow() {
         const files = fs.readdirSync(folder).filter(file => file.endsWith('.js'));
         for (const file of files) {
             try {
-                const pluginPath = \`./plugins/\${file}\`;
-                const module = await import(\`\${pluginPath}?u=\${Date.now()}\`);
+                const pluginPath = `./plugins/${file}`;
+                const module = await import(`${pluginPath}?u=${Date.now()}`);
                 plugins[file] = module.default;
-            } catch (e) { console.log(\`❌ Error en \${file}: \${e.message}\`); }
+            } catch (e) { console.log(`❌ Error en ${file}: ${e.message}`); }
         }
-        console.log(\`✨ [Sηαdοωβοτ] \${Object.keys(plugins).length} Plugins cargados.\`);
+        console.log(`✨ [ShadowBot] ${Object.keys(plugins).length} Plugins cargados.`);
     };
 
     await loadPlugins();
@@ -42,28 +42,16 @@ async function startShadow() {
     sock.ev.on('messages.upsert', async (chatUpdate) => {
         const m = chatUpdate.messages[0];
         if (!m.message || m.key.fromMe) return;
-
-        const body = m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || m.message.videoMessage?.caption || '';
+        const body = m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || '';
         const prefix = '|'; 
-        
         if (body.startsWith(prefix)) {
             const args = body.slice(prefix.length).trim().split(/ +/);
             const command = args.shift().toLowerCase();
-            const sender = m.key.remoteJid;
-            const name = m.pushName || 'Usuario';
-
-            // 📝 LOGS EN CONSOLA
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━');
-            console.log(\`👤 DE: \${name} (\${sender.split('@')[0]})\`);
-            console.log(\`💻 CMD: \${prefix}\${command}\`);
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━');
-
+            console.log(`━━━━━━━━━━━━━━━━━━━━\n👤 DE: ${m.pushName}\n💻 CMD: ${prefix}${command}\n━━━━━━━━━━━━━━━━━━━━`);
             for (const name in plugins) {
                 const p = plugins[name];
                 if (p.command?.includes(command)) {
-                    try {
-                        await p.run(sock, m, { args, prefix, command });
-                    } catch (err) { console.error(err); }
+                    try { await p.run(sock, m, { args, prefix, command }); } catch (err) { console.error(err); }
                 }
             }
         }
@@ -71,14 +59,13 @@ async function startShadow() {
 
     sock.ev.on('connection.update', (up) => {
         const { connection, lastDisconnect, qr } = up;
-        if (qr) qrcode.generate(qr, { small: true });
-        if (connection === 'open') console.log('✅ Sηαdοωβοτ ONLINE');
+        if (qr) { console.clear(); qrcode.generate(qr, { small: true }); }
+        if (connection === 'open') console.log('✅ BOT ONLINE');
         if (connection === 'close') {
             let reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
             if (reason !== DisconnectReason.loggedOut) startShadow();
         }
     });
-
     sock.ev.on('creds.update', saveCreds);
 }
 startShadow();
