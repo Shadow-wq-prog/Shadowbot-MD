@@ -1,9 +1,8 @@
 import { setTimeout as _setTimeout } from 'node:timers';
 import {
-makeWASocket,
+  makeWASocket,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
-  DisconnectReason,
   makeCacheableSignalKeyStore
 } from "@whiskeysockets/baileys";
 import pino from "pino";
@@ -20,7 +19,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const botName = "Sηαdοωβοτ";
-const ownerName = "Shadow Flash";
 const prefix = '|';
 
 console.clear();
@@ -65,19 +63,21 @@ async function startShadow() {
         const pairingCode = await sock.requestPairingCode(numero);
         console.log(boxen(chalk.bold.white(`TU CÓDIGO:\n\n`) + chalk.bold.bgBlue.white(` ${pairingCode} `), {padding: 1, borderColor: 'yellow'}));
       } catch (e) { console.log("Error al generar código."); }
-    }, 3000);
+    }, 6000);
   }
 
   const plugins = {};
   const loadPlugins = async () => {
     const folder = path.join(__dirname, 'plugins');
     if (!fs.existsSync(folder)) fs.mkdirSync(folder);
-    const files = fs.readdirSync(folder).filter(f => f.endsWith('.js') || f.endsWith('.cjs'));
+    const files = fs.readdirSync(folder).filter(f => f.endsWith('.js'));
     for (const file of files) {
       try {
         const module = await import(`./plugins/${file}?u=${Date.now()}`);
         plugins[file] = module.default;
-      } catch (e) { console.log(`Error en plugin ${file}`); }
+      } catch (e) { 
+        console.log(chalk.red(`❌ Error cargando plugin: ${file}`)); 
+      }
     }
   };
   await loadPlugins();
@@ -85,14 +85,26 @@ async function startShadow() {
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const m = messages[0];
     if (!m || !m.message || m.key.fromMe) return;
+
     const body = m.message.conversation || m.message.extendedTextMessage?.text || m.message.imageMessage?.caption || '';
+    
+    // Log para ver mensajes entrantes en la terminal
+    console.log(chalk.magenta(`[ MSJ ] De: ${m.key.remoteJid.split('@')[0]} | Texto: ${body}`));
+
     if (body.startsWith(prefix)) {
       const args = body.slice(prefix.length).trim().split(/ +/);
       const command = args.shift().toLowerCase();
+      
+      console.log(chalk.cyan(`[ CMD ] Comando detectado: ${command}`));
+
       for (const name in plugins) {
         const p = plugins[name];
-        if (p.command?.includes(command)) {
-          try { await p.run(sock, m, { args, prefix, command }); } catch (err) { console.error(err); }
+        if (p && p.command && p.command.includes(command)) {
+          try { 
+            await p.run(sock, m, { args, prefix, command }); 
+          } catch (err) { 
+            console.error(chalk.red(`Error en comando ${command}:`), err); 
+          }
         }
       }
     }
@@ -101,10 +113,11 @@ async function startShadow() {
   sock.ev.on("connection.update", (update) => {
     const { qr, connection } = update;
     if (qr && !usarCodigo) qrcode.generate(qr, { small: true });
-    if (connection === "open") console.log(chalk.bold.green(`\n✅ ${botName} ONLINE`));
+    if (connection === "open") console.log(chalk.bold.green(`\n✅ ${botName} ONLINE\n`));
     if (connection === "close") startShadow();
   });
 
   sock.ev.on("creds.update", saveCreds);
 }
-startShadow();
+
+startShadow().catch(err => console.error("Error fatal:", err));
