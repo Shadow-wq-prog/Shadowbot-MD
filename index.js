@@ -3,8 +3,31 @@ import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, Browser
 import pino from "pino";
 import chalk from "chalk";
 import fs from "fs";
+import path from "path";
+import { fileURLToPath } from 'url';
+import cfonts from 'cfonts';
 import { smsg } from "./lib/message.js";
 import db from "./lib/system/database.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// LOGO GIGANTE
+console.clear();
+cfonts.say('Shadow|Bot', { font: 'block', align: 'center', gradient: ['blue', 'magenta'] });
+
+global.plugins = {};
+async function loadPlugins() {
+    const folder = path.join(__dirname, 'plugins');
+    const files = fs.readdirSync(folder).filter(f => f.endsWith('.js'));
+    for (const file of files) {
+        try {
+            const module = await import(`./plugins/${file}?u=${Date.now()}`);
+            global.plugins[file] = module.default;
+        } catch (e) { console.error(`❌ Error en ${file}: ${e.message}`); }
+    }
+    console.log(chalk.greenBright(`📂 ${Object.keys(global.plugins).length} Plugins cargados correctamente`));
+}
 
 async function startShadow() {
   const { state, saveCreds } = await useMultiFileAuthState('./sessions');
@@ -13,12 +36,10 @@ async function startShadow() {
   const sock = makeWASocket({
     version,
     logger: pino({ level: "silent" }),
-    printQRInTerminal: true,
     browser: Browsers.ubuntu('Chrome'),
     auth: state
   });
 
-  // Injectar decodeJid para que lib/message no falle
   sock.decodeJid = (jid) => {
     if (!jid) return jid;
     if (/:\d+@/gi.test(jid)) {
@@ -31,13 +52,10 @@ async function startShadow() {
     try {
       let m = chatUpdate.messages[0];
       if (!m || !m.message) return;
-      
       let msg = smsg(sock, m, sock);
       const handler = (await import('./handler.js')).default;
       await handler(sock, msg, chatUpdate);
-    } catch (e) {
-      if (!e.message.includes('split')) console.error(e);
-    }
+    } catch (e) { }
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -48,8 +66,9 @@ async function startShadow() {
   });
 }
 
-// Iniciar base de datos y luego el bot
-global.loadDatabase().then(() => {
-  console.log(chalk.blueBright("📦 Base de datos cargada"));
-  startShadow();
-}).catch(console.error);
+// Cargar todo en orden
+(async () => {
+    await global.loadDatabase();
+    await loadPlugins();
+    await startShadow();
+})();
