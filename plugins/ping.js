@@ -4,11 +4,11 @@ Plugin: Ping corregido
 
 export default {
     command: ['p', 'ping'],
-    run: async (sock, m, args) => {
-        // Obtenemos el ID del chat correctamente
+    run: async (sock, m, { args }) => { // <--- Agregamos las llaves { } aquí
+        // Obtenemos el ID del chat
         const from = m.key.remoteJid;
         
-        // Calculamos la latencia
+        // Calculamos la latencia de forma real
         const start = Date.now();
         const latencia = Date.now() - start;
 
