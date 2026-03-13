@@ -1,38 +1,21 @@
-const yts = require('yt-search');
-const axios = require('axios');
+import yts from 'yt-search';
 
-module.exports = {
-  command: ['play', 'musica'],
-  run: async (sock, m, from, args) => {
-    const text = args.join(' ');
-    if (!text) return sock.sendMessage(from, { text: '✨ *Sηαdοωβοτ* - ¿Qué buscas?\n*Ejemplo:* .play Believer' }, { quoted: m });
+const handler = {
+    command: ['play', 'musica'],
+    run: async (sock, m, { args }) => {
+        if (!args[0]) return sock.sendMessage(m.key.remoteJid, { text: '¿Qué canción buscamos? Ejemplo: |play botita' }, { quoted: m });
+        
+        const chat = m.key.remoteJid;
+        const res = await yts(args.join(' '));
+        const video = res.videos[0];
 
-    try {
-      await sock.sendMessage(from, { react: { text: '🔍', key: m.key } });
-      const search = await yts(text);
-      const video = search.videos[0];
-      if (!video) return sock.sendMessage(from, { text: '❌ No lo encontré.' }, { quoted: m });
+        if (!video) return sock.sendMessage(chat, { text: 'No encontré nada.' }, { quoted: m });
 
-      let info = `┏━━ ✨ *Sηαdοωβοτ PLAY* ✨ ━━┓\n`;
-      info += `┃ ◈ *Título:* ${video.title}\n`;
-      info += `┃ ◈ *Duración:* ${video.timestamp}\n`;
-      info += `┗━━━━━━━━━━━━━━━━┛\n\n> ⏳ *Procesando audio premium...*`;
-
-      await sock.sendMessage(from, { image: { url: video.thumbnail }, caption: info }, { quoted: m });
-
-      const apiRes = await axios.get(`https://api.aggelos-007.xyz/api/ytmp3?url=${video.url}`);
-      const dl_url = apiRes.data.result.download_url || apiRes.data.result;
-
-      await sock.sendMessage(from, { 
-        audio: { url: dl_url }, 
-        mimetype: 'audio/mpeg', 
-        fileName: `${video.title}.mp3` 
-      }, { quoted: m });
-
-      await sock.sendMessage(from, { react: { text: '✅', key: m.key } });
-
-    } catch (error) {
-      sock.sendMessage(from, { text: '❌ Error en los servidores de música. Intenta más tarde.' }, { quoted: m });
+        await sock.sendMessage(chat, { 
+            image: { url: video.thumbnail }, 
+            caption: `🎬 *Título:* ${video.title}\n🔗 *Link:* ${video.url}` 
+        }, { quoted: m });
     }
-  }
 };
+
+export default handler;
