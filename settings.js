@@ -13,7 +13,7 @@ global.prems = []
 
 // --- CONFIGURACIÓN DEL BOT ---
 global.botName = 'Sηαdοωβοτ'
-global.prefix = '|'
+global.prefix = '/'
 global.sessionName = 'sessions' // Ajustado para que coincida con tu index.js
 global.pairing_code = true
 
