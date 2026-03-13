@@ -1,15 +1,11 @@
-import "./settings.js"
-import { setTimeout as _setTimeout, setInterval as _setInterval } from 'node:timers';
-import handler from './handler.js'
-import events from './commands/events.js'
+import "./settings.js";
+import { setTimeout as _setTimeout } from 'node:timers';
 import {
   Browsers,
   makeWASocket,
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
-  jidDecode,
-  DisconnectReason,
 } from "@whiskeysockets/baileys";
 import cfonts from 'cfonts';
 import pino from "pino";
@@ -20,11 +16,6 @@ import path from "path";
 import { fileURLToPath } from 'url';
 import readlineSync from "readline-sync";
 import boxen from 'boxen';
-import { smsg } from "./lib/message.js";
-import { startSubBot } from './lib/subs.js';
-import { startModBot } from './lib/mods.js';
-import { startPremBot } from './lib/prems.js';
-import { exec } from "child_process";
 import db from "./lib/system/database.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,7 +30,6 @@ const log = {
 };
 
 const botName = "Sηαdοωβοτ";
-const prefix = '|';
 
 // --- INTERFAZ INICIAL ---
 console.clear();
@@ -56,7 +46,6 @@ function normalizePhone(input) {
 let usarCodigo = false;
 let numero = "";
 
-// --- SELECCIÓN DE MÉTODO ---
 if (!fs.existsSync(`./sessions/creds.json`)) {
   let lineM = '⋯ ⋯ ⋯ ⋯ ⋯ ⋯ ⋯ ⋯ ⋯ ⋯ ⋯ 》';
   console.log(chalk.cyan(`╭${lineM}\n┊ ${chalk.bold.yellow('ELIJA MÉTODO DE CONEXIÓN')}\n┊ 1. QR\n┊ 2. Código de 8 dígitos\n╰${lineM}`));
@@ -68,8 +57,8 @@ if (!fs.existsSync(`./sessions/creds.json`)) {
   }
 }
 
-// --- CARGA DINÁMICA DE PLUGINS ---
-const plugins = {};
+// --- CARGA DE PLUGINS ---
+global.plugins = {};
 const loadPlugins = async () => {
   const folder = path.join(__dirname, 'plugins');
   if (!fs.existsSync(folder)) fs.mkdirSync(folder);
@@ -77,7 +66,7 @@ const loadPlugins = async () => {
   for (const file of files) {
     try {
       const module = await import(`./plugins/${file}?u=${Date.now()}`);
-      plugins[file] = module.default;
+      global.plugins[file] = module.default;
     } catch (e) { 
       console.log(chalk.red(`❌ Error en plugin: ${file}`)); 
     }
@@ -92,16 +81,16 @@ async function startShadow() {
     version,
     logger: pino({ level: "silent" }),
     printQRInTerminal: false,
-    browser: Browsers.macOS('Chrome'),
+    mobile: false,
+    browser: Browsers.ubuntu('Chrome'),
     auth: {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" })),
     }
   });
 
-  global.client = sock;
+  global.sock = sock;
 
-  // --- GENERACIÓN DE CÓDIGO ---
   if (usarCodigo && !sock.authState.creds.registered) {
     _setTimeout(async () => {
       try {
@@ -114,59 +103,27 @@ async function startShadow() {
 
   await loadPlugins();
 
-  // --- MANEJO DE MENSAJES ---
+  // --- MANEJO DE MENSAJES (SISTEMA ÚNICO) ---
   sock.ev.on('messages.upsert', async chatUpdate => {
     try {
-        let m = chatUpdate.messages[0]
-        if (!m) return
-        if (m.key.fromMe) return // Ignorar mensajes del propio bot
-        
-        // --- PROTECCIÓN ANTI-SPLIT ---
-        // Forzamos a que m.sender siempre tenga un valor antes del split
-        m.sender = sock.decodeJid(m.key.participant || m.key.remoteJid || sock.user.id) || ''
-        
-        // Cargamos el mensaje usando smsg (con seguridad)
-        const smsg = (await import('./lib/message.js')).smsg
-        let msg = smsg(sock, m, sock)
-        
-        // Llamamos al handler
-        const handler = (await import('./handler.js')).default
-        await handler(sock, msg, chatUpdate)
+        let m = chatUpdate.messages[0];
+        if (!m || !m.message) return;
+        if (m.key && m.key.remoteJid === 'status@broadcast') return;
+
+        // Limpieza de mensaje con smsg
+        const { smsg } = await import("./lib/message.js");
+        let msg = smsg(sock, m, sock);
+
+        // Llamada al Handler (Él maneja comandos y logs)
+        const handler = (await import('./handler.js')).default;
+        await handler(sock, msg, chatUpdate);
 
     } catch (err) {
-        // En lugar de morir, el bot ahora solo ignorará el mensaje corrupto
-        console.error("⚠️ Error procesando mensaje:", err.message)
-    }
-})
-
-      // Log de consola (Morado como te gustaba)
-      console.log(chalk.magenta(`[ MSJ ] De: ${m.sender.split('@')[0]} | Texto: ${body}`));
-
-      // Lógica de Comandos
-      if (body.startsWith(prefix)) {
-        const args = body.slice(prefix.length).trim().split(/ +/);
-        const command = args.shift().toLowerCase();
-        
-        console.log(chalk.cyan(`[ CMD ] Ejecutando: ${command}`));
-
-        for (const name in plugins) {
-          const p = plugins[name];
-          if (p && p.command && p.command.includes(command)) {
-            await p.run(sock, m, { args, prefix, command });
-          }
-        }
-      }
-
-      // Ejecutar handler y eventos generales (del segundo código)
-      if (typeof handler === 'function') handler(sock, m, messages);
-      if (typeof events === 'function') await events(sock, m);
-
-    } catch (err) {
-      if (!err.message?.includes('data')) log.error(err);
+        if (err.message?.includes('split')) return; // Silenciar error de split residual
+        console.error(chalk.red("⚠️ Error procesando mensaje:"), err);
     }
   });
 
-  // --- ACTUALIZACIÓN DE CONEXIÓN ---
   sock.ev.on("connection.update", async (update) => {
     const { qr, connection, lastDisconnect } = update;
     if (qr && !usarCodigo) qrcode.generate(qr, { small: true });
@@ -177,20 +134,21 @@ async function startShadow() {
 
     if (connection === "close") {
       const reason = lastDisconnect?.error?.output?.statusCode;
-      log.warn(`Conexión cerrada. Razón: ${reason}. Reintentando...`);
-      startShadow();
+      if (reason !== DisconnectReason.loggedOut) {
+        log.warn(`Conexión cerrada. Reintentando...`);
+        startShadow();
+      }
     }
   });
 
   sock.ev.on("creds.update", saveCreds);
 }
 
-// --- INICIO DE BASE DE DATOS Y BOT ---
+// --- ARRANQUE ---
 (async () => {
   try {
-    if (db && typeof db.loadDatabase === 'function') await db.loadDatabase();
+    await db.loadDatabase();
     log.success('Base de datos cargada.');
   } catch (e) { log.error('Error en DB: ' + e); }
-
   await startShadow();
 })();
