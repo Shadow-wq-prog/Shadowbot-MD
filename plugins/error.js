@@ -10,7 +10,7 @@ import { execSync } from 'child_process'
 export default {
   command: ['error', 'debug', 'check'],
   category: 'system',
-  isOwner: true, // Solo tú puedes usarlo
+  isOwner: false, // Solo tú puedes usarlo
   run: async (client, m, { args }) => {
     const from = m.key.remoteJid
     
