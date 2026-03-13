@@ -1,4 +1,7 @@
-import { sticker } from 'sticker-maded' // Usaremos una librería directa
+/*
+Sηαdοωβοτ - Sticker Simple
+*/
+import { sticker } from 'sticker-maded' 
 
 export default {
     command: ['s', 'sticker'],
@@ -11,7 +14,7 @@ export default {
             await client.sendMessage(from, { react: { text: '⏳', key: m.key } })
             let img = await q.download()
             
-            // Enviamos el sticker directamente
+            // Enviamos el sticker usando la data directa
             await client.sendMessage(from, { 
                 sticker: img, 
                 packname: 'Sηαdοωβοτ', 
