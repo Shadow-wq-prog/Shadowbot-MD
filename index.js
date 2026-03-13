@@ -1,4 +1,4 @@
-cat <<'EOF' > index.js
+rm index.js && cat <<'EOF' > index.js
 import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } from "@whiskeysockets/baileys";
 import pino from "pino";
 import readlineSync from "readline-sync";
