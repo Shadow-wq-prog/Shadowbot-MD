@@ -115,16 +115,29 @@ async function startShadow() {
   await loadPlugins();
 
   // --- MANEJO DE MENSAJES ---
-  sock.ev.on("messages.upsert", async ({ messages }) => {
+  sock.ev.on('messages.upsert', async chatUpdate => {
     try {
-      let m = messages[0];
-      if (!m || !m.message || m.key.fromMe) return;
+        let m = chatUpdate.messages[0]
+        if (!m) return
+        if (m.key.fromMe) return // Ignorar mensajes del propio bot
+        
+        // --- PROTECCIÓN ANTI-SPLIT ---
+        // Forzamos a que m.sender siempre tenga un valor antes del split
+        m.sender = sock.decodeJid(m.key.participant || m.key.remoteJid || sock.user.id) || ''
+        
+        // Cargamos el mensaje usando smsg (con seguridad)
+        const smsg = (await import('./lib/message.js')).smsg
+        let msg = smsg(sock, m, sock)
+        
+        // Llamamos al handler
+        const handler = (await import('./handler.js')).default
+        await handler(sock, msg, chatUpdate)
 
-      // Formatear mensaje con smsg para compatibilidad
-      try { m = await smsg(sock, m); } catch (e) {}
-
-      const body = m.text || '';
-      const from = m.chat;
+    } catch (err) {
+        // En lugar de morir, el bot ahora solo ignorará el mensaje corrupto
+        console.error("⚠️ Error procesando mensaje:", err.message)
+    }
+})
 
       // Log de consola (Morado como te gustaba)
       console.log(chalk.magenta(`[ MSJ ] De: ${m.sender.split('@')[0]} | Texto: ${body}`));
