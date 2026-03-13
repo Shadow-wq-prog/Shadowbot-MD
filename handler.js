@@ -24,18 +24,20 @@ export default async function handler(sock, m, chatUpdate) {
                 p && p.command && (Array.isArray(p.command) ? p.command.includes(command) : p.command === command)
             )
 
-            if (plugin) {
-                await plugin(m, { 
-                    sock, 
-                    client: sock, 
-                    usedPrefix: prefix, 
-                    command, 
-                    text: m.body.slice(prefix.length + command.length).trim(), 
-                    isOwner 
-                })
-            }
+              if (plugin) {
+        // --- ESTE ES EL CAMBIO ---
+        let run = typeof plugin === 'function' ? plugin : plugin.run || plugin.default
+        if (typeof run === 'function') {
+          await run(m, { 
+            sock, 
+            client: sock, 
+            usedPrefix: prefix, 
+            command, 
+            text: m.body.slice(prefix.length + command.length).trim(), 
+            isOwner 
+          })
+        } else {
+          console.log(chalk.yellow(`[ ! ] El plugin de '${command}' no tiene una función ejecutable.`))
         }
-    } catch (e) {
-        console.error(chalk.red(`[ ERROR HANDLER ]`), e)
-    }
-}
+        // -------------------------
+      }
