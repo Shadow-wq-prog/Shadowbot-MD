@@ -1,7 +1,6 @@
-cat <<'EOF' > index.js
 import { setTimeout as _setTimeout } from 'node:timers';
 import {
-  makeWASocket,
+makeWASocket,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   DisconnectReason,
@@ -109,4 +108,3 @@ async function startShadow() {
   sock.ev.on("creds.update", saveCreds);
 }
 startShadow();
-EOF
