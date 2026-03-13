@@ -10,7 +10,7 @@ global.owner = [
 
 // ⚡ CONFIGURACIÓN DE PREFIJOS (Multi-Prefix)
 // El bot responderá a comandos que empiecen con: . ! # o /
-global.prefix = /^[.!#/]/
+global.prefix =  |
 
 // 🤖 INFORMACIÓN DEL BOT
 global.packname = 'Sηαdοωβοτ'
